@@ -18,7 +18,7 @@ Jokers selected from the 50-idea brainstorm; checked items are implemented.
 - [x] **Defibrillator** — once per round: revive a dead pile (active button)
 - [x] **Reshuffle** — once per round: shuffle a live pile back into deck (active button)
 - [x] **Phoenix** — first dead pile auto-revives after 3 correct guesses
-- [ ] Surgeon — once per round, swap top cards of two piles
+- [x] **Surgeon** — once per round, move the top card of a dead pile onto a live pile
 - [ ] The Cooler — once per round, discard the next deck card
 - [ ] Tower of Pisa — piles can stack ×2 deeper before scoring caps
 - [ ] Architect — at round start, see all 9 starting cards and rearrange them
@@ -53,7 +53,11 @@ Jokers selected from the 50-idea brainstorm; checked items are implemented.
 - [ ] Quickdraw — first 3 guesses each round score ×3 if all correct
 - [ ] Marathon — streak builds ×0.5 per correct (slower but uncapped)
 
-### Deck / setup modifiers (deferred — will become consumables)
+### Deck / setup modifiers
+- [x] **A Little Smaller** — no 6s; each of 2, 3, 4, 5 appears 5 times instead of 4
+- [x] **A Little Bigger** — no 8s; each of 9, 10, J, Q appears 5 times instead of 4
+- [x] **Dyslexic** — all 2s become 5s
+- [x] **Seven Ate Nine** — all 9s become 7s
 - [ ] Loaded Dice
 - [ ] Hot Deck
 - [ ] Stacked Hand
@@ -62,13 +66,13 @@ Jokers selected from the 50-idea brainstorm; checked items are implemented.
 - [ ] Mirror Match
 
 ### Build-around / synergy enablers
+- [x] **Wildcard** — 5 cards in the deck are wild; any guess is correct when one flips (golden border)
 - [ ] The Collector — gain +5 pts per joker owned, per correct guess
 - [ ] Synergy Engine — every 3rd correct guess copies a random joker effect
-- [ ] Wild Card — once per round, treat any guess as automatically correct (no points but no kill)
 - [ ] The Investor — start each round with -50 score; first 5 correct guesses score ×4
 
 ### Boss / legendary tier
 - [ ] The Architect of Fate — see full deck order, but commit pile choices 3 cards in advance
 - [ ] Robot Sympathizer — wrong guesses score points equal to half what right guesses would have
 
-**Currently implemented: 13 jokers**
+**Currently implemented: 19 jokers**

@@ -34,6 +34,12 @@ const ALL_JOKERS = [
   { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff" },
   { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom card of the deck.", color: "#ddaa00" },
   { id: "combo", name: "COMBO BREAKER", desc: "Wrong guesses bank +1 streak for next hit.", color: "#ff99cc" },
+  { id: "wildcard", name: "WILDCARD", desc: "5 cards in the deck are wild — any guess is correct when one flips.", color: "#ffd700" },
+  { id: "surgeon", name: "SURGEON", desc: "Once per round: move the top card of a dead pile onto a live pile.", color: "#ff69b4" },
+  { id: "smaller", name: "A LITTLE SMALLER", desc: "No 6s. Each of 2, 3, 4, 5 appears 5 times instead of 4.", color: "#88aaff" },
+  { id: "bigger", name: "A LITTLE BIGGER", desc: "No 8s. Each of 9, 10, J, Q appears 5 times instead of 4.", color: "#ffaa66" },
+  { id: "dyslexic", name: "DYSLEXIC", desc: "All 2s become 5s.", color: "#bb88ff" },
+  { id: "sevennine", name: "SEVEN ATE NINE", desc: "All 9s become 7s.", color: "#ff8844" },
 ];
 
 const pickJokerOptions = (owned) => {
@@ -51,6 +57,7 @@ const guessProbability = (top, direction, deckRemaining) => {
 
   let favorable = 0;
   for (const c of deckRemaining) {
+    if (c.wild) { favorable++; continue; }
     const cIsAce = c.rank === "A";
     const cLow = cIsAce ? 1 : RANK_VALUE[c.rank];
     const cHigh = cIsAce ? 14 : RANK_VALUE[c.rank];
@@ -273,7 +280,7 @@ function Card({ card, faceDown, dim, peelCard }) {
         width: "100%",
         height: "100%",
         background: "#fff",
-        border: "2px solid #000",
+        border: card.wild ? "3px solid #ffd700" : "2px solid #000",
         boxShadow: "3px 3px 0 #000",
         opacity: dim ? 0.5 : 1,
         filter: dim ? "grayscale(0.4)" : "none",
@@ -284,6 +291,13 @@ function Card({ card, faceDown, dim, peelCard }) {
         boxSizing: "border-box",
       }}
     >
+      {card.wild && (
+        <div style={{
+          position: "absolute", top: "3%", right: "6%",
+          color: "#ffd700", fontSize: "clamp(10px, 10cqw, 20px)",
+          fontFamily: "'VT323', monospace", lineHeight: 1, zIndex: 1,
+        }}>★</div>
+      )}
       <div style={{ position: "absolute", top: "3%", left: "6%", lineHeight: 1, fontSize: "clamp(14px, 14cqw, 28px)", fontWeight: 700 }}>
         <div>{card.rank}</div>
         <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
@@ -434,7 +448,9 @@ export default function BeatTheRobot() {
   const [phoenixTarget, setPhoenixTarget] = useState(null); // pile idx to revive
   const [bankedStreak, setBankedStreak] = useState(0); // combo breaker
   const [correctCount, setCorrectCount] = useState(0); // for compound interest
-  const [activeMode, setActiveMode] = useState(null); // 'defib' | 'reshuffle' — pile-targeting
+  const [activeMode, setActiveMode] = useState(null); // 'defib' | 'reshuffle' | 'surgeon' — pile-targeting
+  const [surgeonUsed, setSurgeonUsed] = useState(false);
+  const [surgeonSource, setSurgeonSource] = useState(null); // dead-pile idx during surgeon two-step
   const [showRules, setShowRules] = useState(false);
   const [rulesClosing, setRulesClosing] = useState(false);
   const helpBtnRef = useRef(null);
@@ -463,7 +479,39 @@ export default function BeatTheRobot() {
     : Math.floor(ROUND_TARGETS[ROUND_TARGETS.length - 1] * Math.pow(1.5, round - ROUND_TARGETS.length));
 
   const startRound = (roundNum) => {
-    const d = buildDeck();
+    let d = buildDeck();
+
+    // Deck modifiers
+    if (hasJoker("smaller")) {
+      let filtered = d.filter(c => c.rank !== "6");
+      ["5", "4", "3", "2"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i] }));
+      for (let i = filtered.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+      }
+      d = filtered;
+    }
+    if (hasJoker("bigger")) {
+      let filtered = d.filter(c => c.rank !== "8");
+      ["9", "10", "J", "Q"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i] }));
+      for (let i = filtered.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+      }
+      d = filtered;
+    }
+    if (hasJoker("dyslexic")) {
+      d = d.map(c => c.rank === "2" ? { ...c, rank: "5" } : c);
+    }
+    if (hasJoker("sevennine")) {
+      d = d.map(c => c.rank === "9" ? { ...c, rank: "7" } : c);
+    }
+    if (hasJoker("wildcard")) {
+      const indices = new Set();
+      while (indices.size < 5) indices.add(Math.floor(Math.random() * d.length));
+      d = d.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
+    }
+
     const initial = [];
     for (let i = 0; i < 9; i++) initial.push([d.shift()]);
     setPiles(initial);
@@ -479,6 +527,8 @@ export default function BeatTheRobot() {
     setPhoenixUsed(false);
     setPhoenixCounter(0);
     setPhoenixTarget(null);
+    setSurgeonUsed(false);
+    setSurgeonSource(null);
     setActiveMode(null);
     setMessage(`ROUND ${roundNum} — Reach ${ROUND_TARGETS[roundNum - 1]} pts.`);
     setFlashPile(null);
@@ -577,6 +627,28 @@ export default function BeatTheRobot() {
       setMessage(`*** Pile ${idx + 1} reshuffled into deck. ***`);
       return;
     }
+    if (activeMode === "surgeon") {
+      if (surgeonSource === null) {
+        if (!deadPiles[idx]) { setMessage("SURGEON: Pick a DEAD pile."); return; }
+        setSurgeonSource(idx);
+        setMessage("SURGEON: Now pick a LIVE pile to receive the card.");
+        return;
+      } else {
+        if (deadPiles[idx]) { setMessage("SURGEON: Pick a LIVE pile."); return; }
+        const topCard = piles[surgeonSource][piles[surgeonSource].length - 1];
+        const newPiles = piles.map((p, i) => {
+          if (i === surgeonSource) return p.slice(0, -1);
+          if (i === idx) return [...p, topCard];
+          return p;
+        });
+        setPiles(newPiles);
+        setSurgeonUsed(true);
+        setSurgeonSource(null);
+        setActiveMode(null);
+        setMessage(`*** SURGEON: Card moved to pile ${idx + 1}. ***`);
+        return;
+      }
+    }
 
     if (deadPiles[idx]) return;
     setSelectedPile(idx);
@@ -613,8 +685,10 @@ export default function BeatTheRobot() {
     const nextLow = nextIsAce ? 1 : RANK_VALUE[next.rank];
     const nextHigh = nextIsAce ? 14 : RANK_VALUE[next.rank];
 
+    const isWild = next.wild === true;
     let correct = false;
-    if (direction === "higher") correct = nextHigh > topLow && top.rank !== next.rank;
+    if (isWild) correct = true;
+    else if (direction === "higher") correct = nextHigh > topLow && top.rank !== next.rank;
     else if (direction === "lower") correct = nextLow < topHigh && top.rank !== next.rank;
     else if (direction === "same") correct = top.rank === next.rank;
 
@@ -630,6 +704,8 @@ export default function BeatTheRobot() {
       // ===== Joker multipliers =====
       let mult = 1;
       const breakdown = [];
+
+      if (isWild) breakdown.push("WILD★");
 
       if (hasJoker("lucky7") && top.rank === "7") {
         mult *= 3;
@@ -1302,7 +1378,7 @@ export default function BeatTheRobot() {
                 onTouchMove={onPileTouchMove}
                 onTouchEnd={onPileTouchEnd}
                 onTouchCancel={onPileTouchEnd}
-                disabled={(isDead && activeMode !== "defib") || phase !== "playing"}
+                disabled={(isDead && activeMode !== "defib" && !(activeMode === "surgeon" && surgeonSource === null)) || phase !== "playing"}
                 style={{
                   position: "relative",
                   background: "transparent",
@@ -1311,7 +1387,7 @@ export default function BeatTheRobot() {
                   width: "100%",
                   height: "100%",
                   cursor:
-                    (isDead && activeMode !== "defib") || phase !== "playing"
+                    (isDead && activeMode !== "defib" && !(activeMode === "surgeon" && surgeonSource === null)) || phase !== "playing"
                       ? "default"
                       : "pointer",
                   outline: isSelected
@@ -1320,6 +1396,12 @@ export default function BeatTheRobot() {
                     ? "3px dashed #ff3355"
                     : activeMode === "reshuffle" && !isDead
                     ? "3px dashed #aa88ff"
+                    : activeMode === "surgeon" && surgeonSource === null && isDead
+                    ? "3px dashed #ff69b4"
+                    : activeMode === "surgeon" && surgeonSource !== null && !isDead
+                    ? "3px dashed #ff69b4"
+                    : surgeonSource === idx
+                    ? "3px solid #ff69b4"
                     : "none",
                   outlineOffset: 2,
                   animation: flashing
@@ -1492,7 +1574,7 @@ export default function BeatTheRobot() {
         })()}
 
         {/* Active joker abilities */}
-        {phase === "playing" && (hasJoker("defib") || hasJoker("reshuffle")) && (
+        {phase === "playing" && (hasJoker("defib") || hasJoker("reshuffle") || hasJoker("surgeon")) && (
           <div style={{ display: "flex", gap: 6, marginBottom: 8, flexShrink: 0 }}>
             {hasJoker("defib") && (
               <DOSButton
@@ -1520,6 +1602,26 @@ export default function BeatTheRobot() {
                 full
               >
                 {activeMode === "reshuffle" ? "✕ Cancel" : "♻ Reshuffle"}
+              </DOSButton>
+            )}
+            {hasJoker("surgeon") && (
+              <DOSButton
+                onClick={() => {
+                  if (activeMode === "surgeon") {
+                    setActiveMode(null);
+                    setSurgeonSource(null);
+                    setMessage("Cancelled.");
+                  } else {
+                    setActiveMode("surgeon");
+                    setMessage("SURGEON: Pick a DEAD pile.");
+                  }
+                }}
+                disabled={surgeonUsed || deadPiles.every((d) => !d)}
+                variant="default"
+                small
+                full
+              >
+                {activeMode === "surgeon" ? "✕ Cancel" : "✂ Surgeon"}
               </DOSButton>
             )}
           </div>
