@@ -26,8 +26,8 @@ const ALL_JOKERS = [
   { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa" },
   { id: "even", name: "EVEN STEVEN", desc: "Drawing an even rank (2/4/6/8/10/Q) scores ×2.", color: "#88ddff" },
   { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800" },
-  { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% odds score ×2.", color: "#cc66ff" },
-  { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% odds score ×1.5.", color: "#66ff66" },
+  { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
+  { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
   { id: "defib", name: "DEFIBRILLATOR", desc: "Once per round: revive a dead pile.", color: "#ff3355" },
   { id: "reshuffle", name: "RESHUFFLE", desc: "Once per round: shuffle a live pile back into deck.", color: "#aa88ff" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600" },
@@ -736,7 +736,7 @@ export default function BeatTheRobot() {
       if (streakMult > 1) msg += ` ×${streakMult} streak`;
       if (direction === "same" && revived > 0) msg += ` — ${revived} revived!`;
       setMessage(msg);
-      setSelectedPile(null);
+      // Keep the pile selected so desktop players don't need to re-click after each guess.
     } else {
       // Wrong guess
       setStreak(0);
@@ -814,7 +814,11 @@ export default function BeatTheRobot() {
       if (hasJoker("combo")) msg += ` Streak banked.`;
       msg += ` ${remainingAlive} alive.`;
       setMessage(msg);
-      setSelectedPile(null);
+      // Pile is dead — advance to next alive pile so desktop players don't lose selection.
+      const nextAlive = newDead.findIndex((d, i) => !d && i > idx) !== -1
+        ? newDead.findIndex((d, i) => !d && i > idx)
+        : newDead.findIndex((d) => !d);
+      setSelectedPile(nextAlive === -1 ? null : nextAlive);
     }
   };
 
@@ -1594,7 +1598,7 @@ export default function BeatTheRobot() {
                       {p.conditional.length > 0 && <span style={{ fontSize: 12 }}>+</span>}
                     </div>
                     <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1 }}>
-                      {Math.round(p.prob * 100)}% odds
+                      {Math.round(p.prob * 100)}% chance
                     </div>
                   </>
                 )}
