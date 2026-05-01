@@ -84,3 +84,7 @@ All 13 implemented jokers live in `ALL_JOKERS`. Three categories by behavior:
 ## Joker backlog
 
 `jokers.md` tracks the full joker idea list with checkboxes. 13 are implemented; unchecked items are candidates for future rounds. The file notes which were deliberately excluded (e.g. Peek — broke the guessing mechanic).
+
+## Brainstorm / future ideas
+
+`brainstorm/` contains design explorations that are NOT active work. Do not consider, reference, or implement anything from `brainstorm/` unless the user explicitly asks you to work on new game ideas.
