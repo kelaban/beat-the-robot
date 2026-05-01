@@ -56,6 +56,8 @@ Jokers selected from the 50-idea brainstorm; checked items are implemented.
 ### Deck / setup modifiers
 - [x] **A Little Smaller** — no 6s; each of 2, 3, 4, 5 appears 5 times instead of 4
 - [x] **A Little Bigger** — no 8s; each of 9, 10, J, Q appears 5 times instead of 4
+- [x] **Dyslexic** — all 2s become 5s
+- [x] **Seven Ate Nine** — all 9s become 7s
 - [ ] Loaded Dice
 - [ ] Hot Deck
 - [ ] Stacked Hand
@@ -73,4 +75,4 @@ Jokers selected from the 50-idea brainstorm; checked items are implemented.
 - [ ] The Architect of Fate — see full deck order, but commit pile choices 3 cards in advance
 - [ ] Robot Sympathizer — wrong guesses score points equal to half what right guesses would have
 
-**Currently implemented: 17 jokers**
+**Currently implemented: 19 jokers**

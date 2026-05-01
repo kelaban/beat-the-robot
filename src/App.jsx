@@ -38,6 +38,8 @@ const ALL_JOKERS = [
   { id: "surgeon", name: "SURGEON", desc: "Once per round: move the top card of a dead pile onto a live pile.", color: "#ff69b4" },
   { id: "smaller", name: "A LITTLE SMALLER", desc: "No 6s. Each of 2, 3, 4, 5 appears 5 times instead of 4.", color: "#88aaff" },
   { id: "bigger", name: "A LITTLE BIGGER", desc: "No 8s. Each of 9, 10, J, Q appears 5 times instead of 4.", color: "#ffaa66" },
+  { id: "dyslexic", name: "DYSLEXIC", desc: "All 2s become 5s.", color: "#bb88ff" },
+  { id: "sevennine", name: "SEVEN ATE NINE", desc: "All 9s become 7s.", color: "#ff8844" },
 ];
 
 const pickJokerOptions = (owned) => {
@@ -497,6 +499,12 @@ export default function BeatTheRobot() {
         [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
       }
       d = filtered;
+    }
+    if (hasJoker("dyslexic")) {
+      d = d.map(c => c.rank === "2" ? { ...c, rank: "5" } : c);
+    }
+    if (hasJoker("sevennine")) {
+      d = d.map(c => c.rank === "9" ? { ...c, rank: "7" } : c);
     }
     if (hasJoker("wildcard")) {
       const indices = new Set();
