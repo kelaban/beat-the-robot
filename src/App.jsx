@@ -1098,7 +1098,7 @@ export default function BeatTheRobot() {
   // release to commit guess. The card itself moves with the finger.
   const onPileTouchStart = (i) => (e) => {
     if (e.touches.length !== 1) return;
-    if (deadPiles[i] || phase !== "playing" || hasJoker("sticky")) return;
+    if (deadPiles[i] || phase !== "playing") return;
     swipeStart.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
