@@ -17,17 +17,17 @@ const buildDeck = () => {
 };
 
 // Round targets — exponential climb
-const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 2000, 3500];
+const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 2000, 3500, 6000, 10000, 17000, 28000];
 
 // ===== Jokers =====
 const ALL_JOKERS = [
-  { id: "lucky7", name: "LUCKY.7", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00" },
+  { id: "777", name: "777", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00" },
   { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa" },
   { id: "even", name: "EVEN STEVEN", desc: "Guessing on an even rank (2/4/6/8/10/Q) scores ×2.", color: "#88ddff" },
   { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800" },
   { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
   { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
-  { id: "defib", name: "DEFIBRILLATOR", desc: "Once per round: revive a dead pile.", color: "#ff3355" },
+  { id: "luckyguess", name: "LUCKY GUESS", desc: "When hot streak reaches 10% cumulative prob, revive 1 dead pile.", color: "#ff3355" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600" },
   { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff" },
   { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom card of the deck.", color: "#ddaa00" },
@@ -43,7 +43,7 @@ const CURSED_JOKERS = [
 ];
 
 const pickJokerOptions = (owned, round) => {
-  if (round % 3 === 0) {
+  if (round % 3 === 2) {
     const alreadyOwned = owned.filter((j) => j.cursed).map((j) => j.id);
     const available = CURSED_JOKERS.filter((j) => !alreadyOwned.includes(j.id));
     const pool = available.length >= 2 ? available : CURSED_JOKERS;
@@ -107,7 +107,7 @@ const previewScore = (pile, direction, deck, ownedJokers, streak, bankedStreak, 
     unconditionalMult *= 5;
     unconditional.push("Compound ×5");
   }
-  if (has("lucky7") && top.rank === "7") {
+  if (has("777") && top.rank === "7") {
     unconditionalMult *= 3;
     unconditional.push("Lucky 7 ×3");
   }
@@ -443,14 +443,12 @@ export default function BeatTheRobot() {
   const [newCardPile, setNewCardPile] = useState(null); // pile idx for slide-in animation
 
   // Joker per-round state
-  const [defibUsed, setDefibUsed] = useState(false);
   const [phoenixUsed, setPhoenixUsed] = useState(false);
   const [phoenixCounter, setPhoenixCounter] = useState(0); // counts correct guesses since first death
   const [phoenixTarget, setPhoenixTarget] = useState(null); // pile idx to revive
   const [bankedStreak, setBankedStreak] = useState(0); // combo breaker
   const [correctCount, setCorrectCount] = useState(0); // for compound interest
-  const [activeMode, setActiveMode] = useState(null); // 'defib' — pile-targeting
-  const [deadweightTriggered, setDeadweightTriggered] = useState(false);
+  const [hotStreak, setHotStreak] = useState(1); // cumulative probability for Lucky Guess
   const [guessCount, setGuessCount] = useState(0);
   const [showRules, setShowRules] = useState(false);
   const [rulesClosing, setRulesClosing] = useState(false);
@@ -460,6 +458,8 @@ export default function BeatTheRobot() {
   // Dev mode
   const [devMode, setDevMode] = useState(false);
   const [devRoundInput, setDevRoundInput] = useState("1");
+  const [devSidebarWidth, setDevSidebarWidth] = useState(180);
+  const [isResizing, setIsResizing] = useState(false);
 
   // Swipe tracking (mobile)
   const swipeStart = useRef(null);
@@ -487,9 +487,23 @@ export default function BeatTheRobot() {
     }
   }, []);
 
-  const target = round <= ROUND_TARGETS.length
-    ? ROUND_TARGETS[round - 1]
-    : Math.floor(ROUND_TARGETS[ROUND_TARGETS.length - 1] * Math.pow(1.5, round - ROUND_TARGETS.length));
+  // Sidebar resize handling
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMouseMove = (e) => {
+      const newWidth = Math.max(120, Math.min(400, e.clientX));
+      setDevSidebarWidth(newWidth);
+    };
+    const handleMouseUp = () => setIsResizing(false);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
+  const target = ROUND_TARGETS[round - 1];
 
   const startRound = (roundNum) => {
     const d = buildDeck();
@@ -514,12 +528,10 @@ export default function BeatTheRobot() {
     setStreak(0);
     setBankedStreak(0);
     setCorrectCount(0);
-    setDefibUsed(false);
+    setHotStreak(1);
     setPhoenixUsed(false);
     setPhoenixCounter(0);
     setPhoenixTarget(null);
-    setActiveMode(null);
-    setDeadweightTriggered(false);
     setGuessCount(0);
     setMessage(`ROUND ${roundNum} — Reach ${ROUND_TARGETS[roundNum - 1]} pts.`);
     setFlashPile(null);
@@ -592,33 +604,17 @@ export default function BeatTheRobot() {
     // Sticky: pile selection is locked
     if (hasJoker("sticky")) return;
 
-    // Active modes: defib targets a pile
-    if (activeMode === "defib") {
-      if (!deadPiles[idx]) {
-        setMessage("Pick a DEAD pile to revive.");
-        return;
-      }
-      const newDead = deadPiles.map((d, i) => (i === idx ? false : d));
-      setDeadPiles(newDead);
-      setDefibUsed(true);
-      setActiveMode(null);
-      setMessage(`*** DEFIB! Pile ${idx + 1} revived. ***`);
-      // If phoenix was targeting this pile, clear it (already revived)
-      if (phoenixTarget === idx) setPhoenixTarget(null);
-      return;
-    }
-
     if (deadPiles[idx]) return;
     setSelectedPile(idx);
 
     // Show context about active conditional jokers if any
     const conditionals = [];
-    if (hasJoker("lucky7")) conditionals.push("L7×3 guessing on a 7");
+    if (hasJoker("777")) conditionals.push("L7×3 guessing on a 7");
     if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q top");
     if (conditionals.length > 0) {
       setMessage(`Pick a guess. Bonus: ${conditionals.join(" · ")}`);
     } else {
-      setMessage(`Pick a guess. Streak ×${streak} · ${deck.length} deck`);
+      setMessage(`Pick a guess. Streak ×${streak}${hasJoker("luckyguess") ? ` · HOT ${(hotStreak * 100).toFixed(1)}%` : ""} · ${deck.length} deck`);
     }
   };
 
@@ -692,7 +688,7 @@ export default function BeatTheRobot() {
       let mult = 1;
       const breakdown = [];
 
-      if (hasJoker("lucky7") && top.rank === "7") {
+      if (hasJoker("777") && top.rank === "7") {
         mult *= 3;
         breakdown.push("L7×3");
       }
@@ -729,6 +725,19 @@ export default function BeatTheRobot() {
       setStreak(newStreak);
       setBankedStreak(0);
       setStreakPulse((p) => p + 1);
+
+      // Lucky Guess: update hot streak and trigger if < 10%
+      if (hasJoker("luckyguess")) {
+        const newHot = hotStreak * probability;
+        setHotStreak(newHot);
+        if (newHot < 0.1 && deadPiles.some((d) => d)) {
+          const deadIdx = deadPiles.findIndex((d) => d);
+          const newDead = deadPiles.map((d, i) => (i === deadIdx ? false : d));
+          setDeadPiles(newDead);
+          setMessage(`*** LUCKY GUESS! Pile ${deadIdx + 1} revived. ***`);
+          if (phoenixTarget === deadIdx) setPhoenixTarget(null);
+        }
+      }
 
       const earned = Math.floor(base * mult * streakMult);
       setRoundScore((s) => s + earned);
@@ -786,9 +795,14 @@ export default function BeatTheRobot() {
       // Round cleared
       if (newRoundScore >= target) {
         setRunScore((rs) => rs + newRoundScore);
-        setPhase("roundWon");
-        setJokerOptions(pickJokerOptions(ownedJokers, round));
-        setMessage(`*** ROUND ${round} CLEARED — ${newRoundScore} pts ***`);
+        if (round >= ROUND_TARGETS.length) {
+          setPhase("runWon");
+          setMessage(`*** YOU BEAT THE ROBOT! Final score: ${runScore + newRoundScore} pts ***`);
+        } else {
+          setPhase("roundWon");
+          setJokerOptions(pickJokerOptions(ownedJokers, round));
+          setMessage(`*** ROUND ${round} CLEARED — ${newRoundScore} pts ***`);
+        }
         setSelectedPile(null);
         return;
       }
@@ -810,17 +824,14 @@ export default function BeatTheRobot() {
     } else {
       // Wrong guess
       setStreak(0);
+      setHotStreak(1);
       // Combo Breaker banks
       if (hasJoker("combo")) {
         setBankedStreak((b) => b + 1);
       }
 
-      // Determine kills (Gambler kills 2, Dead Weight first wrong kills 2)
-      let killCount = hasJoker("gambler") ? 2 : 1;
-      if (hasJoker("deadweight") && !deadweightTriggered) {
-        killCount = Math.max(killCount, 2);
-        setDeadweightTriggered(true);
-      }
+      // Determine kills (Gambler kills 2)
+      const killCount = hasJoker("gambler") ? 2 : 1;
       let newDead = deadPiles.map((d, i) => (i === idx ? true : d));
       // Pick additional pile to kill (random alive)
       if (killCount > 1) {
@@ -859,9 +870,14 @@ export default function BeatTheRobot() {
       if (remainingAlive === 0) {
         if (roundScore >= target) {
           setRunScore((rs) => rs + roundScore);
-          setPhase("roundWon");
-          setJokerOptions(pickJokerOptions(ownedJokers, round));
-          setMessage(`*** ROUND ${round} CLEARED — ${roundScore} pts ***`);
+          if (round >= ROUND_TARGETS.length) {
+            setPhase("runWon");
+            setMessage(`*** YOU BEAT THE ROBOT! Final score: ${runScore + roundScore} pts ***`);
+          } else {
+            setPhase("roundWon");
+            setJokerOptions(pickJokerOptions(ownedJokers, round));
+            setMessage(`*** ROUND ${round} CLEARED — ${roundScore} pts ***`);
+          }
         } else {
           setPhase("runOver");
           setMessage(`*** ALL PILES DEAD. Needed ${target}, got ${roundScore}. ***`);
@@ -945,7 +961,7 @@ export default function BeatTheRobot() {
     }
     setSelectedPile(nextIdx);
     const conditionals = [];
-    if (hasJoker("lucky7")) conditionals.push("L7×3 guessing on a 7");
+    if (hasJoker("777")) conditionals.push("L7×3 guessing on a 7");
     if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q top");
     if (conditionals.length > 0) {
       setMessage(`Pile ${nextIdx + 1}. Bonus: ${conditionals.join(" · ")}`);
@@ -978,7 +994,7 @@ export default function BeatTheRobot() {
           e.preventDefault();
           break;
         case "ArrowUp":
-          if (selectedPile !== null && !activeMode) {
+          if (selectedPile !== null) {
             // Hard Way Out check for keyboard
             if (hasJoker("hardwayout") && (guessCount + 1) % 5 === 0) {
               const top = piles[selectedPile][piles[selectedPile].length - 1];
@@ -992,7 +1008,7 @@ export default function BeatTheRobot() {
           }
           break;
         case "ArrowDown":
-          if (selectedPile !== null && !activeMode) {
+          if (selectedPile !== null) {
             // Hard Way Out check for keyboard
             if (hasJoker("hardwayout") && (guessCount + 1) % 5 === 0) {
               const top = piles[selectedPile][piles[selectedPile].length - 1];
@@ -1008,7 +1024,7 @@ export default function BeatTheRobot() {
         case " ":
         case "s":
         case "S":
-          if (selectedPile !== null && !activeMode) {
+          if (selectedPile !== null) {
             guess("same");
             e.preventDefault();
           }
@@ -1020,13 +1036,13 @@ export default function BeatTheRobot() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, selectedPile, activeMode, deadPiles, piles, deck, showRules]);
+  }, [phase, selectedPile, deadPiles, piles, deck, showRules]);
 
   // Swipe-from-pile: track which pile the touch started on, follow finger,
   // release to commit guess. The card itself moves with the finger.
   const onPileTouchStart = (i) => (e) => {
     if (e.touches.length !== 1) return;
-    if (deadPiles[i] || activeMode || phase !== "playing") return;
+    if (deadPiles[i] || phase !== "playing") return;
     swipeStart.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
@@ -1072,7 +1088,6 @@ export default function BeatTheRobot() {
       Math.abs(dy) > FLICK_THRESHOLD &&
       Math.abs(dy) > Math.abs(dx) &&
       !deadPiles[pileIdx] &&
-      !activeMode &&
       phase === "playing"
     ) {
       // Auto-select the pile and guess in one motion
@@ -1169,6 +1184,8 @@ export default function BeatTheRobot() {
           display: "flex",
           flexDirection: "column",
           minHeight: 0,
+          paddingLeft: devMode ? devSidebarWidth + 10 : 0,
+          transition: "padding-left 0.2s ease",
         }}
       >
         {/* Title bar */}
@@ -1328,30 +1345,54 @@ export default function BeatTheRobot() {
 
         {/* Owned jokers strip */}
         {ownedJokers.length > 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${Math.min(ownedJokers.length, 4)}, 1fr)`,
-              gap: 4,
-              marginBottom: 8,
-              flexShrink: 0,
-            }}
-          >
-            {ownedJokers.map((j) => {
-              const depleted =
-                (j.id === "defib" && defibUsed) ||
-                (j.id === "phoenix" && phoenixUsed);
-              return (
-                <JokerCard
-                  key={j.id}
-                  joker={j}
-                  small
-                  depleted={depleted}
-                  selectable
-                  onSelect={() => setJokerInfo(j)}
-                />
-              );
-            })}
+          <div style={{ marginBottom: 8, flexShrink: 0 }}>
+            {ownedJokers.filter(j => !j.cursed).length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${Math.min(ownedJokers.filter(j => !j.cursed).length, 4)}, 1fr)`,
+                  gap: 4,
+                  marginBottom: 4,
+                }}
+              >
+                {ownedJokers.filter(j => !j.cursed).map((j) => {
+                  const depleted = j.id === "phoenix" && phoenixUsed;
+                  return (
+                    <JokerCard
+                      key={j.id}
+                      joker={j}
+                      small
+                      depleted={depleted}
+                      selectable
+                      onSelect={() => setJokerInfo(j)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {ownedJokers.filter(j => j.cursed).length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${Math.min(ownedJokers.filter(j => j.cursed).length, 4)}, 1fr)`,
+                  gap: 4,
+                }}
+              >
+                {ownedJokers.filter(j => j.cursed).map((j) => {
+                  const depleted = j.id === "phoenix" && phoenixUsed;
+                  return (
+                    <JokerCard
+                      key={j.id}
+                      joker={j}
+                      small
+                      depleted={depleted}
+                      selectable
+                      onSelect={() => setJokerInfo(j)}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1402,7 +1443,7 @@ export default function BeatTheRobot() {
                 onTouchMove={onPileTouchMove}
                 onTouchEnd={onPileTouchEnd}
                 onTouchCancel={onPileTouchEnd}
-                disabled={(isDead && activeMode !== "defib") || phase !== "playing"}
+                disabled={isDead || phase !== "playing"}
                 style={{
                   position: "relative",
                   background: "transparent",
@@ -1411,13 +1452,11 @@ export default function BeatTheRobot() {
                   width: "100%",
                   height: "100%",
                   cursor:
-                    (isDead && activeMode !== "defib") || phase !== "playing"
+                    isDead || phase !== "playing"
                       ? "default"
                       : "pointer",
                   outline: isSelected
                     ? "3px solid #ffff00"
-                    : activeMode === "defib" && isDead
-                    ? "3px dashed #ff3355"
                     : "none",
                   outlineOffset: 2,
                   animation: flashing
@@ -1553,7 +1592,7 @@ export default function BeatTheRobot() {
             formula = `H/L: 10 × stack depth · SAME: 50 · next streak ×${projStreakMult}`;
           }
 
-          const stats = `Streak ×${streak}${bankedStreak > 0 ? ` (+${bankedStreak} banked)` : ""} · ${deck.length} in deck · ${aliveCount} alive`;
+          const stats = `Streak ×${streak}${bankedStreak > 0 ? ` (+${bankedStreak} banked)` : ""}${hasJoker("luckyguess") ? ` · HOT ${(hotStreak * 100).toFixed(1)}%` : ""} · ${deck.length} in deck · ${aliveCount} alive`;
 
           return (
             <div
@@ -1589,26 +1628,6 @@ export default function BeatTheRobot() {
           );
         })()}
 
-        {/* Active joker abilities */}
-        {phase === "playing" && hasJoker("defib") && (
-          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexShrink: 0 }}>
-            {hasJoker("defib") && (
-              <DOSButton
-                onClick={() =>
-                  setActiveMode((m) => (m === "defib" ? null : "defib")) ||
-                  setMessage(activeMode === "defib" ? "Cancelled." : "DEFIB: tap a dead pile.")
-                }
-                disabled={defibUsed || deadPiles.every((d) => !d)}
-                variant="danger"
-                small
-                full
-              >
-                {activeMode === "defib" ? "✕ Cancel" : "⚡ Defib"}
-              </DOSButton>
-            )}
-          </div>
-        )}
-
         {/* Guess controls with score previews */}
         {phase === "playing" && (() => {
           const previews = selectedPile !== null
@@ -1631,7 +1650,7 @@ export default function BeatTheRobot() {
               restrictedDir = probH >= probL ? "higher" : "lower";
             }
             const hardWayDisabled = dir === restrictedDir;
-            const disabled = selectedPile === null || !!activeMode || hardWayDisabled;
+            const disabled = selectedPile === null || hardWayDisabled;
             const colors = {
               default: { bg: "#c0c0c0", fg: "#000" },
               primary: { bg: "#ffff00", fg: "#000" },
@@ -1867,7 +1886,7 @@ export default function BeatTheRobot() {
             >
               ★ YOU BEAT THE ROBOT ★
               <div style={{ fontFamily: "'VT323', monospace", fontSize: 20, marginTop: 8 }}>
-                You exhausted the full deck!
+                {round >= ROUND_TARGETS.length ? "You beat all 12 rounds!" : "You exhausted the full deck!"}
               </div>
               <div style={{ fontFamily: "'VT323', monospace", fontSize: 16, marginTop: 4 }}>
                 Total: {runScore} pts
@@ -1886,17 +1905,38 @@ export default function BeatTheRobot() {
         <div
           style={{
             position: "fixed",
-            bottom: 0,
+            top: 0,
             left: 0,
-            right: 0,
+            bottom: 0,
+            width: devSidebarWidth,
             background: "#1a1a2e",
-            borderTop: "3px solid #00ff00",
+            borderRight: "3px solid #00ff00",
             padding: "10px 12px",
             zIndex: 50,
-            maxHeight: "40vh",
             overflow: "auto",
           }}
         >
+          {/* Resize handle */}
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizing(true);
+            }}
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 8,
+              cursor: "ew-resize",
+              background: isResizing ? "rgba(0,255,0,0.3)" : "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div style={{ width: 3, height: 30, background: "#00ff00", borderRadius: 2 }} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <span style={{ color: "#00ff00", fontFamily: "'Press Start 2P', monospace", fontSize: 10 }}>
               DEV MODE
@@ -1917,6 +1957,17 @@ export default function BeatTheRobot() {
               ✕
             </button>
           </div>
+          {deck.length > 0 && (
+            <div style={{ marginBottom: 8, padding: "6px 8px", background: "#000", border: "1px solid #00ff00" }}>
+              <span style={{ color: "#00ff00", fontFamily: "'Press Start 2P', monospace", fontSize: 8 }}>NEXT CARD:</span>
+              <span style={{ marginLeft: 8, color: deck[0].suit === "♥" || deck[0].suit === "♦" ? "#ff5555" : "#fff", fontFamily: "'VT323', monospace", fontSize: 18 }}>
+                {deck[0].rank}{deck[0].suit}
+              </span>
+              <span style={{ marginLeft: 8, color: "#888", fontFamily: "'VT323', monospace", fontSize: 12 }}>
+                ({deck.length - 1} more in deck)
+              </span>
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <span style={{ color: "#fff", fontFamily: "'VT323', monospace", fontSize: 14 }}>Round:</span>
@@ -1983,10 +2034,45 @@ export default function BeatTheRobot() {
           </div>
           <div style={{ marginBottom: 8 }}>
             <span style={{ color: "#888", fontFamily: "'VT323', monospace", fontSize: 12, marginBottom: 4, display: "block" }}>
-              Add Joker:
+              Add Regular Joker:
             </span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {[...ALL_JOKERS, ...CURSED_JOKERS].map((j) => {
+              {ALL_JOKERS.map((j) => {
+                const alreadyOwned = ownedJokers.some((o) => o.id === j.id);
+                return (
+                  <button
+                    key={j.id}
+                    onClick={() => {
+                      if (!alreadyOwned) {
+                        setOwnedJokers((prev) => [...prev, j]);
+                        setMessage(`DEV: Added ${j.name}`);
+                        setTimeout(() => setMessage(""), 2000);
+                      }
+                    }}
+                    disabled={alreadyOwned}
+                    style={{
+                      background: j.color,
+                      border: "1px solid #000",
+                      color: "#000",
+                      cursor: alreadyOwned ? "not-allowed" : "pointer",
+                      fontFamily: "'VT323', monospace",
+                      fontSize: 11,
+                      padding: "2px 4px",
+                      opacity: alreadyOwned ? 0.4 : 1,
+                    }}
+                  >
+                    {j.id}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <span style={{ color: "#cc2222", fontFamily: "'VT323', monospace", fontSize: 12, marginBottom: 4, display: "block" }}>
+              Add Curse:
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {CURSED_JOKERS.map((j) => {
                 const alreadyOwned = ownedJokers.some((o) => o.id === j.id);
                 return (
                   <button
@@ -2181,6 +2267,9 @@ export default function BeatTheRobot() {
               }}
             >
               {jokerInfo.name}
+              {jokerInfo.cursed && (
+                <span style={{ marginLeft: 6, fontSize: 8, color: "#cc2222" }}>CURSE</span>
+              )}
             </div>
             <div style={{ fontSize: 16, lineHeight: 1.3, color: "#ddd", marginBottom: 14 }}>
               {jokerInfo.desc}
