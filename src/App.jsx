@@ -21,10 +21,10 @@ const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 2000, 3500];
 
 // ===== Jokers =====
 const ALL_JOKERS = [
-  { id: "lucky7", name: "LUCKY.7", desc: "Drawing a 7 scores ×3.", color: "#ffcc00" },
+  { id: "lucky7", name: "LUCKY.7", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00" },
   { id: "gambler", name: "THE GAMBLER", desc: "All scores ×2. Wrong guesses kill 2 piles.", color: "#ff5555" },
   { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa" },
-  { id: "even", name: "EVEN STEVEN", desc: "Drawing an even rank (2/4/6/8/10/Q) scores ×2.", color: "#88ddff" },
+  { id: "even", name: "EVEN STEVEN", desc: "Guessing on an even rank (2/4/6/8/10/Q) scores ×2.", color: "#88ddff" },
   { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800" },
   { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
   { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
@@ -94,11 +94,16 @@ const previewScore = (pile, direction, deck, ownedJokers, streak, bankedStreak, 
     unconditionalMult *= 5;
     unconditional.push("Compound ×5");
   }
+  if (has("lucky7") && top.rank === "7") {
+    unconditionalMult *= 3;
+    unconditional.push("Lucky 7 ×3");
+  }
+  if (has("even") && EVEN_RANKS.has(top.rank)) {
+    unconditionalMult *= 2;
+    unconditional.push("Even Steven ×2");
+  }
 
-  // Conditional ones (depend on what next card is)
   const conditional = [];
-  if (has("lucky7")) conditional.push("×3 if next is 7");
-  if (has("even")) conditional.push("×2 if even rank");
 
   // Streak
   const projectedStreak = streak + 1 + bankedStreak;
@@ -404,6 +409,7 @@ export default function BeatTheRobot() {
   const [runScore, setRunScore] = useState(0);
   const [ownedJokers, setOwnedJokers] = useState([]);
   const [jokerOptions, setJokerOptions] = useState([]);
+  const [jokerInfo, setJokerInfo] = useState(null);
 
   // Round state
   const [deck, setDeck] = useState([]);
@@ -577,8 +583,8 @@ export default function BeatTheRobot() {
 
     // Show context about active conditional jokers if any
     const conditionals = [];
-    if (hasJoker("lucky7")) conditionals.push("L7×3 on a 7");
-    if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q");
+    if (hasJoker("lucky7")) conditionals.push("L7×3 guessing on a 7");
+    if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q top");
     if (conditionals.length > 0) {
       setMessage(`Pick a guess. Bonus: ${conditionals.join(" · ")}`);
     } else {
@@ -625,11 +631,11 @@ export default function BeatTheRobot() {
       let mult = 1;
       const breakdown = [];
 
-      if (hasJoker("lucky7") && next.rank === "7") {
+      if (hasJoker("lucky7") && top.rank === "7") {
         mult *= 3;
         breakdown.push("L7×3");
       }
-      if (hasJoker("even") && EVEN_RANKS.has(next.rank)) {
+      if (hasJoker("even") && EVEN_RANKS.has(top.rank)) {
         mult *= 2;
         breakdown.push("EVEN×2");
       }
@@ -868,8 +874,8 @@ export default function BeatTheRobot() {
     }
     setSelectedPile(nextIdx);
     const conditionals = [];
-    if (hasJoker("lucky7")) conditionals.push("L7×3 on a 7");
-    if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q");
+    if (hasJoker("lucky7")) conditionals.push("L7×3 guessing on a 7");
+    if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q top");
     if (conditionals.length > 0) {
       setMessage(`Pile ${nextIdx + 1}. Bonus: ${conditionals.join(" · ")}`);
     } else {
@@ -1241,8 +1247,8 @@ export default function BeatTheRobot() {
                   joker={j}
                   small
                   depleted={depleted}
-                  selectable={false}
-                  onSelect={() => {}}
+                  selectable
+                  onSelect={() => setJokerInfo(j)}
                 />
               );
             })}
@@ -1637,6 +1643,19 @@ export default function BeatTheRobot() {
               }}
             >
               <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 11, marginBottom: 6 }}>CHOOSE A JOKER</div>
+              <div
+                style={{
+                  fontFamily: "'Press Start 2P', monospace",
+                  fontSize: 9,
+                  color: "#00aa44",
+                  marginBottom: 4,
+                }}
+              >
+                SCORE CLEARED
+              </div>
+              <div style={{ fontSize: 14 }}>
+                {roundScore} / {target} pts (+{roundScore - target})
+              </div>
               <div style={{ fontSize: 14 }}>Run total: {runScore} pts</div>
             </div>
             <div style={{ display: "grid", gap: 6 }}>
@@ -1828,6 +1847,55 @@ export default function BeatTheRobot() {
                 · <b>Desktop:</b> ← → cycle piles, ↑ HIGHER, ↓ LOWER, Space SAME, 1-9 select pile.
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Joker info modal */}
+      {jokerInfo && (
+        <div
+          onClick={() => setJokerInfo(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#1a1a2e",
+              border: `3px solid ${jokerInfo.color}`,
+              boxShadow: "5px 5px 0 #000",
+              padding: 16,
+              maxWidth: 360,
+              width: "100%",
+              color: "#fff",
+              fontFamily: "'VT323', monospace",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: 12,
+                color: jokerInfo.color,
+                letterSpacing: 1,
+                marginBottom: 10,
+              }}
+            >
+              {jokerInfo.name}
+            </div>
+            <div style={{ fontSize: 16, lineHeight: 1.3, color: "#ddd", marginBottom: 14 }}>
+              {jokerInfo.desc}
+            </div>
+            <DOSButton onClick={() => setJokerInfo(null)} variant="primary" full>
+              OK
+            </DOSButton>
           </div>
         </div>
       )}
