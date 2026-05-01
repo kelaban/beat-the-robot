@@ -452,7 +452,9 @@ export default function BeatTheRobot() {
     }
   }, []);
 
-  const target = ROUND_TARGETS[round - 1] ?? 9999;
+  const target = round <= ROUND_TARGETS.length
+    ? ROUND_TARGETS[round - 1]
+    : Math.floor(ROUND_TARGETS[ROUND_TARGETS.length - 1] * Math.pow(1.5, round - ROUND_TARGETS.length));
 
   const startRound = (roundNum) => {
     const d = buildDeck();
@@ -717,16 +719,17 @@ export default function BeatTheRobot() {
       // Round cleared
       if (newRoundScore >= target) {
         setRunScore((rs) => rs + newRoundScore);
-        setPhase(round >= ROUND_TARGETS.length ? "runWon" : "roundWon");
-        if (round < ROUND_TARGETS.length) setJokerOptions(pickJokerOptions(ownedJokers));
+        setPhase("roundWon");
+        setJokerOptions(pickJokerOptions(ownedJokers));
         setMessage(`*** ROUND ${round} CLEARED — ${newRoundScore} pts ***`);
         setSelectedPile(null);
         return;
       }
 
       if (remainingDeck.length === 0) {
-        setPhase("runOver");
-        setMessage(`*** RAN OUT OF DECK. Needed ${target}, got ${newRoundScore}. ***`);
+        setRunScore((rs) => rs + newRoundScore);
+        setPhase("runWon");
+        setMessage(`*** DECK CLEARED — YOU BEAT THE ROBOT! ***`);
         setSelectedPile(null);
         return;
       }
@@ -785,8 +788,8 @@ export default function BeatTheRobot() {
       if (remainingAlive === 0) {
         if (roundScore >= target) {
           setRunScore((rs) => rs + roundScore);
-          setPhase(round >= ROUND_TARGETS.length ? "runWon" : "roundWon");
-          if (round < ROUND_TARGETS.length) setJokerOptions(pickJokerOptions(ownedJokers));
+          setPhase("roundWon");
+          setJokerOptions(pickJokerOptions(ownedJokers));
           setMessage(`*** ROUND ${round} CLEARED — ${roundScore} pts ***`);
         } else {
           setPhase("runOver");
@@ -796,15 +799,9 @@ export default function BeatTheRobot() {
         return;
       }
       if (remainingDeck.length === 0) {
-        if (roundScore >= target) {
-          setRunScore((rs) => rs + roundScore);
-          setPhase(round >= ROUND_TARGETS.length ? "runWon" : "roundWon");
-          if (round < ROUND_TARGETS.length) setJokerOptions(pickJokerOptions(ownedJokers));
-          setMessage(`*** ROUND ${round} CLEARED — ${roundScore} pts ***`);
-        } else {
-          setPhase("runOver");
-          setMessage(`*** DECK EMPTY. Needed ${target}, got ${roundScore}. ***`);
-        }
+        setRunScore((rs) => rs + roundScore);
+        setPhase("runWon");
+        setMessage(`*** DECK CLEARED — YOU BEAT THE ROBOT! ***`);
         setSelectedPile(null);
         return;
       }
@@ -1725,9 +1722,12 @@ export default function BeatTheRobot() {
                 fontSize: 12,
               }}
             >
-              ★ RUN COMPLETE ★
-              <div style={{ fontFamily: "'VT323', monospace", fontSize: 16, marginTop: 8 }}>
-                Total: {runScore + roundScore} pts
+              ★ YOU BEAT THE ROBOT ★
+              <div style={{ fontFamily: "'VT323', monospace", fontSize: 20, marginTop: 8 }}>
+                You exhausted the full deck!
+              </div>
+              <div style={{ fontFamily: "'VT323', monospace", fontSize: 16, marginTop: 4 }}>
+                Total: {runScore} pts
               </div>
             </div>
             <DOSButton onClick={startNewRun} variant="primary" full>
