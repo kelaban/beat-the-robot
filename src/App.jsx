@@ -28,6 +28,7 @@ const ALL_JOKERS = [
   { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
   { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
   { id: "luckyguess", name: "LUCKY GUESS", desc: "When hot streak reaches 10% cumulative prob, revive 1 dead pile.", color: "#ff3355" },
+  { id: "wildcard", name: "WILDCARD", desc: "5 cards in the deck are wild — any guess is correct.", color: "#ffd700" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600" },
   { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff" },
   { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom card of the deck.", color: "#ddaa00" },
@@ -40,6 +41,10 @@ const CURSED_JOKERS = [
   { id: "royallyscrewed", name: "ROYALLY SCREWED", desc: "The deck has twice as many face cards (J/Q/K).", color: "#cc2222", cursed: true },
   { id: "hardwayout", name: "HARD WAY OUT", desc: "Every 5th guess, you cannot pick the highest-probability option.", color: "#cc2222", cursed: true },
   { id: "reshuffle", name: "AUTO-RESHUFFLE", desc: "Piles auto-shuffle when 13+ cards.", color: "#cc2222", cursed: true },
+  { id: "smaller", name: "A LITTLE SMALLER", desc: "No 6s. Each of 2,3,4,5 appears 5 times instead of 4.", color: "#cc2222", cursed: true },
+  { id: "bigger", name: "A LITTLE BIGGER", desc: "No 8s. Each of 9,10,J,Q appears 5 times instead of 4.", color: "#cc2222", cursed: true },
+  { id: "dyslexic", name: "DYSLEXIC", desc: "All 2s become 5s.", color: "#cc2222", cursed: true },
+  { id: "sevennine", name: "SEVEN ATE NINE", desc: "All 9s become 7s.", color: "#cc2222", cursed: true },
 ];
 
 const pickJokerOptions = (owned, round) => {
@@ -64,6 +69,7 @@ const guessProbability = (top, direction, deckRemaining) => {
 
   let favorable = 0;
   for (const c of deckRemaining) {
+    if (c.wild) { favorable++; continue; } // wild cards always favorable
     const cIsAce = c.rank === "A";
     const cLow = cIsAce ? 1 : RANK_VALUE[c.rank];
     const cHigh = cIsAce ? 14 : RANK_VALUE[c.rank];
@@ -280,13 +286,14 @@ function Card({ card, faceDown, dim, peelCard }) {
   }
 
   const isRed = card.suit === "♥" || card.suit === "♦";
+  const isWild = card.wild;
   return (
     <div
       style={{
         width: "100%",
         height: "100%",
         background: "#fff",
-        border: "2px solid #000",
+        border: isWild ? "3px solid #ffd700" : "2px solid #000",
         boxShadow: "3px 3px 0 #000",
         opacity: dim ? 0.5 : 1,
         filter: dim ? "grayscale(0.4)" : "none",
@@ -297,6 +304,11 @@ function Card({ card, faceDown, dim, peelCard }) {
         boxSizing: "border-box",
       }}
     >
+      {isWild && (
+        <div style={{ position: "absolute", top: "3%", right: "6%", color: "#ffd700", fontSize: "clamp(10px, 10cqw, 20px)", fontFamily: "'VT323', monospace", lineHeight: 1, zIndex: 1 }}>
+          ★
+        </div>
+      )}
       <div style={{ position: "absolute", top: "3%", left: "6%", lineHeight: 1, fontSize: "clamp(14px, 14cqw, 28px)", fontWeight: 700 }}>
         <div>{card.rank}</div>
         <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
@@ -506,23 +518,63 @@ export default function BeatTheRobot() {
   const target = ROUND_TARGETS[round - 1];
 
   const startRound = (roundNum) => {
-    const d = buildDeck();
+    let deck = buildDeck();
     // Royally Screwed: add extra face cards to deck
     if (hasJoker("royallyscrewed")) {
       const faceRanks = ["J", "Q", "K"];
       const suits = ["♠", "♥", "♦", "♣"];
       const extraFaces = faceRanks.flatMap((r) => suits.map((s) => ({ rank: r, suit: s })));
       extraFaces.sort(() => Math.random() - 0.5);
-      const nonFaceIdxs = d.map((c, i) => i).filter((i) => !faceRanks.includes(d[i].rank));
+      const nonFaceIdxs = deck.map((c, i) => i).filter((i) => !faceRanks.includes(deck[i].rank));
       nonFaceIdxs.sort(() => Math.random() - 0.5);
-      nonFaceIdxs.slice(0, 12).forEach((deckIdx, i) => { d[deckIdx] = extraFaces[i]; });
-      d.sort(() => Math.random() - 0.5);
+      nonFaceIdxs.slice(0, 12).forEach((deckIdx, i) => { deck[deckIdx] = extraFaces[i]; });
+      deck.sort(() => Math.random() - 0.5);
     }
+
+    // A Little Smaller: no 6s, extra 2-5
+    if (hasJoker("smaller")) {
+      let filtered = deck.filter(c => c.rank !== "6");
+      ["5", "4", "3", "2"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
+      for (let i = filtered.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+      }
+      deck = filtered;
+    }
+
+    // A Little Bigger: no 8s, extra 9-Q
+    if (hasJoker("bigger")) {
+      let filtered = deck.filter(c => c.rank !== "8");
+      ["Q", "J", "10", "9"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
+      for (let i = filtered.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+      }
+      deck = filtered;
+    }
+
+    // Dyslexic: all 2s become 5s
+    if (hasJoker("dyslexic")) {
+      deck = deck.map(c => c.rank === "2" ? { ...c, rank: "5" } : c);
+    }
+
+    // Seven Ate Nine: all 9s become 7s
+    if (hasJoker("sevennine")) {
+      deck = deck.map(c => c.rank === "9" ? { ...c, rank: "7" } : c);
+    }
+
+    // Wildcard: mark 5 random cards as wild
+    if (hasJoker("wildcard")) {
+      const indices = new Set();
+      while (indices.size < 5) indices.add(Math.floor(Math.random() * deck.length));
+      deck = deck.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
+    }
+
     const initial = [];
-    for (let i = 0; i < 9; i++) initial.push([d.shift()]);
+    for (let i = 0; i < 9; i++) initial.push([deck.shift()]);
     setPiles(initial);
     setDeadPiles(Array(9).fill(false));
-    setDeck(d);
+    setDeck(deck);
     setSelectedPile(null);
     setRoundScore(0);
     setStreak(0);
@@ -655,8 +707,10 @@ export default function BeatTheRobot() {
     const nextLow = nextIsAce ? 1 : RANK_VALUE[next.rank];
     const nextHigh = nextIsAce ? 14 : RANK_VALUE[next.rank];
 
+    const isWild = next.wild;
     let correct = false;
-    if (direction === "higher") correct = nextHigh > topLow && top.rank !== next.rank;
+    if (isWild) correct = true;
+    else if (direction === "higher") correct = nextHigh > topLow && top.rank !== next.rank;
     else if (direction === "lower") correct = nextLow < topHigh && top.rank !== next.rank;
     else if (direction === "same") correct = top.rank === next.rank;
 
@@ -687,6 +741,8 @@ export default function BeatTheRobot() {
       // ===== Joker multipliers =====
       let mult = 1;
       const breakdown = [];
+
+      if (isWild) breakdown.push("WILD★");
 
       if (hasJoker("777") && top.rank === "7") {
         mult *= 3;
