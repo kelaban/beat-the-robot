@@ -378,7 +378,7 @@ function DOSButton({ children, onClick, disabled, variant = "default", small, fu
 }
 
 // ===== Joker card =====
-function JokerCard({ joker, onSelect, selectable, small, depleted }) {
+function JokerCard({ joker, onSelect, selectable, small, depleted, blinking }) {
   return (
     <button
       onClick={onSelect}
@@ -395,6 +395,9 @@ function JokerCard({ joker, onSelect, selectable, small, depleted }) {
         width: "100%",
         opacity: depleted ? 0.4 : 1,
         position: "relative",
+        outline: blinking ? "3px solid #ffff00" : "none",
+        outlineOffset: blinking ? 2 : 0,
+        animation: blinking ? "flashOutline 0.3s ease infinite" : undefined,
       }}
     >
       <div
@@ -444,6 +447,8 @@ export default function BeatTheRobot() {
   const [piles, setPiles] = useState([]);
   const [deadPiles, setDeadPiles] = useState([]);
   const [selectedPile, setSelectedPile] = useState(null);
+  const [jokerBlink, setJokerBlink] = useState(null); // "sticky" | null
+  const blinkTimeoutRef = useRef(null);
   const [message, setMessage] = useState("");
   const [roundScore, setRoundScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -654,7 +659,15 @@ export default function BeatTheRobot() {
   const handlePileClick = (idx) => {
     if (phase !== "playing") return;
     // Sticky: pile selection is locked
-    if (hasJoker("sticky")) return;
+    if (hasJoker("sticky") && selectedPile !== null && idx !== selectedPile) {
+      if (blinkTimeoutRef.current) clearTimeout(blinkTimeoutRef.current);
+      setJokerBlink("sticky");
+      blinkTimeoutRef.current = setTimeout(() => {
+        setJokerBlink(null);
+        blinkTimeoutRef.current = null;
+      }, 600);
+      return;
+    }
 
     if (deadPiles[idx]) return;
     setSelectedPile(idx);
@@ -1099,6 +1112,15 @@ export default function BeatTheRobot() {
   const onPileTouchStart = (i) => (e) => {
     if (e.touches.length !== 1) return;
     if (deadPiles[i] || phase !== "playing") return;
+    if (hasJoker("sticky") && selectedPile !== null && i !== selectedPile) {
+      if (blinkTimeoutRef.current) clearTimeout(blinkTimeoutRef.current);
+      setJokerBlink("sticky");
+      blinkTimeoutRef.current = setTimeout(() => {
+        setJokerBlink(null);
+        blinkTimeoutRef.current = null;
+      }, 600);
+      return;
+    }
     swipeStart.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
@@ -1190,6 +1212,7 @@ export default function BeatTheRobot() {
       <style>{`
         @keyframes flashGood { 0%,100% { box-shadow: 3px 3px 0 #000; } 50% { box-shadow: 0 0 0 4px #00ff00, 3px 3px 0 #000; } }
         @keyframes flashBad { 0% { transform: translateX(0); } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } 100% { transform: translateX(0); } }
+        @keyframes flashOutline { 0%,100% { outline-color: #ffff00; } 50% { outline-color: #ff8800; } }
         @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
         @keyframes floatUp {
           0% { transform: translateY(20%) scale(0.6); opacity: 0; }
@@ -1444,6 +1467,7 @@ export default function BeatTheRobot() {
                       depleted={depleted}
                       selectable
                       onSelect={() => setJokerInfo(j)}
+                      blinking={j.id === jokerBlink}
                     />
                   );
                 })}
