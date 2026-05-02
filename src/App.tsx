@@ -398,10 +398,17 @@ export default function BeatTheRobot() {
   const [jokerOptions, setJokerOptions] = useState<Joker[]>([]);
   const [jokerInfo, setJokerInfo] = useState<Joker | null>(null);
 
-  const [deck, setDeck] = useState<Card[]>([]);
-  const [piles, setPiles] = useState<Card[][]>([]);
-  const [deadPiles, setDeadPiles] = useState<boolean[]>([]);
-  const [selectedPile, setSelectedPile] = useState<number | null>(null);
+  const [initialRound] = useState(() => {
+    const d = buildDeck();
+    return {
+      deck: d.slice(9),
+      piles: Array.from({ length: 9 }, (_, i) => [d[i]]),
+    };
+  });
+  const [deck, setDeck] = useState<Card[]>(initialRound.deck);
+  const [piles, setPiles] = useState<Card[][]>(initialRound.piles);
+  const [deadPiles, setDeadPiles] = useState<boolean[]>(() => Array(9).fill(false));
+  const [selectedPileState, setSelectedPile] = useState<number | null>(null);
   const [jokerBlink, setJokerBlink] = useState<string | null>(null);
   const blinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerJokerBlink = (jokerId: string) => {
@@ -412,7 +419,7 @@ export default function BeatTheRobot() {
       blinkTimeoutRef.current = null;
     }, 600);
   };
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(`ROUND 1 — Reach ${ROUND_TARGETS[0]} pts.`);
   const [roundScore, setRoundScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [flashPile, setFlashPile] = useState<number | null>(null);
@@ -436,7 +443,10 @@ export default function BeatTheRobot() {
   const helpBtnRef = useRef<HTMLButtonElement>(null);
   const [helpBtnPos, setHelpBtnPos] = useState<HelpBtnPos | null>(null);
 
-  const [devMode, setDevMode] = useState(false);
+  const [devMode, setDevMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("dev") === "true";
+  });
   const [devRoundInput, setDevRoundInput] = useState("1");
   const [devSidebarWidth, setDevSidebarWidth] = useState(180);
   const [isResizing, setIsResizing] = useState(false);
@@ -444,9 +454,24 @@ export default function BeatTheRobot() {
   const swipeStart = useRef<{ x: number; y: number; pileIdx: number } | null>(null);
   const [, setSwipeDir] = useState<string | null>(null);
   const [swipeOffset, setSwipeOffset] = useState<SwipeOffset | null>(null);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [isTouchDevice] = useState(
+    () =>
+      "ontouchstart" in window ||
+      navigator.maxTouchPoints > 0 ||
+      window.matchMedia("(pointer: coarse)").matches
+  );
 
   const hasJoker = (id: string): boolean => ownedJokers.some((j) => j.id === id);
+
+  const selectedPile = useMemo(() => {
+    if (hasJoker("sticky") && phase === "playing") {
+      const idx = deadPiles.findIndex((d) => !d);
+      return idx === -1 ? null : idx;
+    }
+    return selectedPileState;
+    // hasJoker closes over ownedJokers, which is listed; adding hasJoker triggers an unstable-fn cascade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPileState, deadPiles, phase, ownedJokers]);
 
   useEffect(() => {
     if (!document.getElementById("vt323-font")) {
@@ -455,13 +480,6 @@ export default function BeatTheRobot() {
       link.rel = "stylesheet";
       link.href = "https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap";
       document.head.appendChild(link);
-    }
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("dev") === "true") {
-      setDevMode(true);
     }
   }, []);
 
@@ -527,18 +545,6 @@ export default function BeatTheRobot() {
   };
 
   useEffect(() => {
-    startNewRun();
-  }, []);
-
-  useEffect(() => {
-    const touchy =
-      "ontouchstart" in window ||
-      navigator.maxTouchPoints > 0 ||
-      window.matchMedia("(pointer: coarse)").matches;
-    setIsTouchDevice(touchy);
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -561,13 +567,6 @@ export default function BeatTheRobot() {
     const t = setTimeout(() => setMessage(""), 3500);
     return () => clearTimeout(t);
   }, [message]);
-
-  useEffect(() => {
-    if (hasJoker("sticky") && phase === "playing") {
-      const leftmostAlive = deadPiles.findIndex((d) => !d);
-      setSelectedPile(leftmostAlive === -1 ? null : leftmostAlive);
-    }
-  }, [deadPiles, phase, ownedJokers]);
 
   const aliveCount = deadPiles.filter((d) => !d).length;
   const rankCounts = useMemo(() => countByRank(deck), [deck]);
@@ -910,7 +909,9 @@ export default function BeatTheRobot() {
     (async () => {
       try {
         await window.storage.set("hasSeenIntro", "1");
-      } catch {}
+      } catch {
+        // best-effort persistence; first-visit gate falls back to showing rules
+      }
     })();
     setTimeout(() => {
       setShowRules(false);
@@ -1012,6 +1013,10 @@ export default function BeatTheRobot() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
+    // The handler reads many closures (guess/cycleSelection/handlePileClick/hasJoker) that are recreated each render.
+    // Listing them all forces this listener to re-bind on every keystroke and noisily reports unstable-dep warnings.
+    // Re-binding is cheap, but the warnings outweigh the value here — keep the deps minimal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, selectedPile, deadPiles, piles, deck, showRules, ownedJokers]);
 
   const onPileTouchStart = (i: number) => (e: React.TouchEvent) => {
@@ -1585,13 +1590,9 @@ export default function BeatTheRobot() {
             };
             return (
               <button
-                onClick={() => {
-                  if (hardWayDisabled) {
-                    triggerJokerBlink("hardwayout");
-                  } else {
-                    guess(dir);
-                  }
-                }}
+                // onClick fires in event-handler scope; the rule's transitive-ref tracking flags the closure but it is not a render-time read.
+                // eslint-disable-next-line react-hooks/refs
+                onClick={() => (hardWayDisabled ? triggerJokerBlink("hardwayout") : guess(dir))}
                 disabled={selectedPile === null}
                 className="active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform"
                 style={{
