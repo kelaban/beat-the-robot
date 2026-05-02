@@ -59,6 +59,56 @@ export function buildDeck(): Card[] {
   return deck;
 }
 
+export function applyJokerEffects(deck: Card[], jokerIds: string[]): Card[] {
+  let result = [...deck];
+
+  if (jokerIds.includes("royallyscrewed")) {
+    const faceRanks = ["J", "Q", "K"];
+    const extraFaces = faceRanks.flatMap((r) => SUITS.map((s) => ({ rank: r, suit: s })));
+    extraFaces.sort(() => Math.random() - 0.5);
+    const nonFaceIdxs = result.map((_c, i) => i).filter((i) => !faceRanks.includes(result[i].rank));
+    nonFaceIdxs.sort(() => Math.random() - 0.5);
+    nonFaceIdxs.slice(0, 12).forEach((deckIdx, i) => { result[deckIdx] = extraFaces[i]; });
+    result.sort(() => Math.random() - 0.5);
+  }
+
+  if (jokerIds.includes("smaller")) {
+    const filtered = result.filter(c => c.rank !== "6");
+    ["5", "4", "3", "2"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
+    for (let i = filtered.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+    }
+    result = filtered;
+  }
+
+  if (jokerIds.includes("bigger")) {
+    const filtered = result.filter(c => c.rank !== "8");
+    ["Q", "J", "10", "9"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
+    for (let i = filtered.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+    }
+    result = filtered;
+  }
+
+  if (jokerIds.includes("dyslexic")) {
+    result = result.map(c => c.rank === "2" ? { ...c, rank: "5" } : c);
+  }
+
+  if (jokerIds.includes("sevennine")) {
+    result = result.map(c => c.rank === "9" ? { ...c, rank: "7" } : c);
+  }
+
+  if (jokerIds.includes("wildcard")) {
+    const indices = new Set<number>();
+    while (indices.size < 5) indices.add(Math.floor(Math.random() * result.length));
+    result = result.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
+  }
+
+  return result;
+}
+
 export function pickJokerOptions(owned: Joker[], round: number): Joker[] {
   if (round % 3 === 2) {
     const alreadyOwned = owned.filter((j) => j.cursed).map((j) => j.id);
@@ -73,6 +123,7 @@ export function pickJokerOptions(owned: Joker[], round: number): Joker[] {
 }
 
 export function guessProbability(top: Card, direction: Direction, deckRemaining: Card[]): number {
+  if (top.wild) return 1;
   if (deckRemaining.length === 0) return 0;
   const topIsAce = top.rank === "A";
   const topLow = topIsAce ? 1 : RANK_VALUE[top.rank];

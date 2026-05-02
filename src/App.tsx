@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { Card, Joker, GamePhase, Direction, Floater, SwipeOffset, HelpBtnPos } from "./types";
 import {
-  SUITS,
   RANKS,
   EVEN_RANKS,
   ROUND_TARGETS,
@@ -12,6 +11,7 @@ import {
   guessProbability,
   countByRank,
   previewScore,
+  applyJokerEffects,
 } from "./constants";
 
 interface CardProps {
@@ -177,41 +177,91 @@ function Card({ card, faceDown, dim, peelCard }: CardProps) {
         boxSizing: "border-box",
       }}
     >
-      {isWild && (
-        <div style={{ position: "absolute", top: "3%", right: "6%", color: "#ffd700", fontSize: "clamp(10px, 10cqw, 20px)", fontFamily: "'VT323', monospace", lineHeight: 1, zIndex: 1 }}>
-          ★
-        </div>
+      {isWild ? (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage:
+                "repeating-linear-gradient(0deg, rgba(0,170,120,0.12) 0 1px, transparent 1px 4px), repeating-linear-gradient(90deg, rgba(0,170,120,0.10) 0 1px, transparent 1px 8px)",
+              pointerEvents: "none",
+            }}
+          />
+          <div style={{ position: "absolute", top: "3%", left: "3%", width: "8%", height: "5%", background: "#00ffaa", boxShadow: "0 0 0 1px #000" }} />
+          <div style={{ position: "absolute", top: "3%", right: "3%", width: "8%", height: "5%", background: "#00ffaa", boxShadow: "0 0 0 1px #000" }} />
+          <div style={{ position: "absolute", bottom: "3%", left: "3%", width: "8%", height: "5%", background: "#00ffaa", boxShadow: "0 0 0 1px #000" }} />
+          <div style={{ position: "absolute", bottom: "3%", right: "3%", width: "8%", height: "5%", background: "#00ffaa", boxShadow: "0 0 0 1px #000" }} />
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <RobotFace />
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              left: "7%",
+              top: "50%",
+              transform: "translate(-50%, -50%) rotate(90deg)",
+              fontFamily: "'Press Start 2P', 'VT323', monospace",
+              fontWeight: 700,
+              fontSize: "clamp(8px, 7cqw, 16px)",
+              letterSpacing: "0.25em",
+              color: "#000",
+              whiteSpace: "nowrap",
+            }}
+          >
+            WILD
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              left: "93%",
+              top: "50%",
+              transform: "translate(-50%, -50%) rotate(-90deg)",
+              fontFamily: "'Press Start 2P', 'VT323', monospace",
+              fontWeight: 700,
+              fontSize: "clamp(8px, 7cqw, 16px)",
+              letterSpacing: "0.25em",
+              color: "#000",
+              whiteSpace: "nowrap",
+            }}
+          >
+            WILD
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ position: "absolute", top: "3%", left: "6%", lineHeight: 1, fontSize: "clamp(14px, 14cqw, 28px)", fontWeight: 700 }}>
+            <div>{card.rank}</div>
+            <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "clamp(28px, 28cqw, 56px)",
+            }}
+          >
+            {card.suit}
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              bottom: "3%",
+              right: "6%",
+              lineHeight: 1,
+              fontSize: "clamp(14px, 14cqw, 28px)",
+              fontWeight: 700,
+              transform: "rotate(180deg)",
+            }}
+          >
+            <div>{card.rank}</div>
+            <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
+          </div>
+        </>
       )}
-      <div style={{ position: "absolute", top: "3%", left: "6%", lineHeight: 1, fontSize: "clamp(14px, 14cqw, 28px)", fontWeight: 700 }}>
-        <div>{card.rank}</div>
-        <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "clamp(28px, 28cqw, 56px)",
-        }}
-      >
-        {card.suit}
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          bottom: "3%",
-          right: "6%",
-          lineHeight: 1,
-          fontSize: "clamp(14px, 14cqw, 28px)",
-          fontWeight: 700,
-          transform: "rotate(180deg)",
-        }}
-      >
-        <div>{card.rank}</div>
-        <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
-      </div>
     </div>
   );
 }
@@ -434,50 +484,15 @@ export default function BeatTheRobot() {
 
   const startRound = (roundNum: number) => {
     let deck: Card[] = buildDeck();
-    if (hasJoker("royallyscrewed")) {
-      const faceRanks = ["J", "Q", "K"];
-      const suits = ["♠", "♥", "♦", "♣"];
-      const extraFaces = faceRanks.flatMap((r) => suits.map((s) => ({ rank: r, suit: s })));
-      extraFaces.sort(() => Math.random() - 0.5);
-      const nonFaceIdxs = deck.map((_c, i) => i).filter((i) => !faceRanks.includes(deck[i].rank));
-      nonFaceIdxs.sort(() => Math.random() - 0.5);
-      nonFaceIdxs.slice(0, 12).forEach((deckIdx, i) => { deck[deckIdx] = extraFaces[i]; });
-      deck.sort(() => Math.random() - 0.5);
-    }
-
-    if (hasJoker("smaller")) {
-      const filtered = deck.filter(c => c.rank !== "6");
-      ["5", "4", "3", "2"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
-      for (let i = filtered.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
-      }
-      deck = filtered;
-    }
-
-    if (hasJoker("bigger")) {
-      const filtered = deck.filter(c => c.rank !== "8");
-      ["Q", "J", "10", "9"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
-      for (let i = filtered.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
-      }
-      deck = filtered;
-    }
-
-    if (hasJoker("dyslexic")) {
-      deck = deck.map(c => c.rank === "2" ? { ...c, rank: "5" } : c);
-    }
-
-    if (hasJoker("sevennine")) {
-      deck = deck.map(c => c.rank === "9" ? { ...c, rank: "7" } : c);
-    }
-
-    if (hasJoker("wildcard")) {
-      const indices = new Set<number>();
-      while (indices.size < 5) indices.add(Math.floor(Math.random() * deck.length));
-      deck = deck.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
-    }
+    const jokerIds = [
+      hasJoker("royallyscrewed") && "royallyscrewed",
+      hasJoker("smaller") && "smaller",
+      hasJoker("bigger") && "bigger",
+      hasJoker("dyslexic") && "dyslexic",
+      hasJoker("sevennine") && "sevennine",
+      hasJoker("wildcard") && "wildcard",
+    ].filter(Boolean) as string[];
+    deck = applyJokerEffects(deck, jokerIds);
 
     const initial: Card[][] = [];
     for (let i = 0; i < 9; i++) {
@@ -621,7 +636,7 @@ export default function BeatTheRobot() {
     const nextLow = nextIsAce ? 1 : RANK_VALUE[next.rank];
     const nextHigh = nextIsAce ? 14 : RANK_VALUE[next.rank];
 
-    const isWild = next.wild;
+    const isWild = next.wild || top.wild;
     let correct = false;
     if (isWild) correct = true;
     else if (direction === "higher") correct = nextHigh > topLow && top.rank !== next.rank;
@@ -1946,6 +1961,35 @@ export default function BeatTheRobot() {
               }}
             >
               Reset Run
+            </button>
+            <button
+              onClick={() => {
+                const inDeck = Math.random() > 0.5 && deck.length > 0;
+                if (inDeck) {
+                  const deckIdx = Math.floor(Math.random() * deck.length);
+                  const newDeck = [...deck];
+                  newDeck[deckIdx] = { ...newDeck[deckIdx], wild: true };
+                  setDeck(newDeck);
+                } else {
+                  const pileIdx = Math.floor(Math.random() * piles.length);
+                  const cardIdx = Math.floor(Math.random() * piles[pileIdx].length);
+                  const newPiles = piles.map((p, i) => i === pileIdx ? p.map((c, j) => j === cardIdx ? { ...c, wild: true } : c) : p);
+                  setPiles(newPiles);
+                }
+                setMessage("DEV: Made random card wild");
+                setTimeout(() => setMessage(""), 2000);
+              }}
+              style={{
+                background: "#00ffff",
+                border: "1px solid #000",
+                color: "#000",
+                cursor: "pointer",
+                fontFamily: "'VT323', monospace",
+                fontSize: 14,
+                padding: "4px 8px",
+              }}
+            >
+              Make Wild
             </button>
           </div>
           <div style={{ marginBottom: 8 }}>
