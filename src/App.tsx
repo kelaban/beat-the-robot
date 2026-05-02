@@ -1222,7 +1222,7 @@ export default function BeatTheRobot() {
             marginBottom: 8,
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr 1fr",
-            gap: 4,
+            gap: 2,
             fontSize: "clamp(14px, 2.6vmin, 22px)",
             color: "#000",
             flexShrink: 0,
@@ -1248,17 +1248,48 @@ export default function BeatTheRobot() {
           </div>
           <div>
             <div style={{ fontSize: "clamp(10px, 1.6vmin, 14px)", opacity: 0.7 }}>STREAK</div>
-            <div
-              key={`streak-${streakPulse}`}
-              style={{
-                fontWeight: 700,
-                color: streak >= 3 ? "#c00000" : "#000",
-                animation: streakPulse > 0 ? "pulse 0.55s ease" : "none",
-                transformOrigin: "left center",
-                display: "inline-block",
-              }}
-            >
-              ×{streak}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {hasJoker("luckyguess") && (
+                <div
+                  style={{
+                    width: 10,
+                    height: 18,
+                    border: "1px solid #000",
+                    boxShadow: "1px 1px 0 #000",
+                    display: "flex",
+                    flexDirection: "column-reverse",
+                    gap: 1,
+                    padding: 1,
+                    background: "#222",
+                  }}
+                >
+                  {Array.from({ length: 5 }).map((_, i) => {
+                    const cellsFilled = Math.max(0, Math.min(5, Math.floor((0.1 - hotStreak) / 0.02) + 5));
+                    const isFilled = i < cellsFilled;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          flex: 1,
+                          background: isFilled ? "#00ff00" : "#444",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              <div
+                key={`streak-${streakPulse}`}
+                style={{
+                  fontWeight: 700,
+                  color: streak >= 3 ? "#c00000" : "#000",
+                  animation: streakPulse > 0 ? "pulse 0.55s ease" : "none",
+                  transformOrigin: "left center",
+                  display: "inline-block",
+                }}
+              >
+                ×{streak}
+              </div>
             </div>
           </div>
           <div>
