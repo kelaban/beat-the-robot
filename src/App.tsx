@@ -1,153 +1,26 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import type { Card, Joker, GamePhase, Direction, Floater, SwipeOffset, HelpBtnPos } from "./types";
+import {
+  SUITS,
+  RANKS,
+  EVEN_RANKS,
+  ROUND_TARGETS,
+  ALL_JOKERS,
+  CURSED_JOKERS,
+  buildDeck,
+  pickJokerOptions,
+  guessProbability,
+  countByRank,
+  previewScore,
+} from "./constants";
 
-// ===== Card values =====
-const SUITS = ["♠", "♥", "♦", "♣"];
-const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const RANK_VALUE = { A: 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, J: 11, Q: 12, K: 13 };
-const EVEN_RANKS = new Set(["2", "4", "6", "8", "10", "Q"]);
+interface CardProps {
+  card: Card | null;
+  faceDown: boolean;
+  dim: boolean;
+  peelCard: Card | null;
+}
 
-const buildDeck = () => {
-  const deck = [];
-  for (const s of SUITS) for (const r of RANKS) deck.push({ rank: r, suit: s });
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
-  return deck;
-};
-
-// Round targets — exponential climb
-const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 2000, 3500, 6000, 10000, 17000, 28000];
-
-// ===== Jokers =====
-const ALL_JOKERS = [
-  { id: "777", name: "777", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00" },
-  { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa" },
-  { id: "even", name: "EVEN STEVEN", desc: "Guessing on an even rank (2/4/6/8/10/Q) scores ×2.", color: "#88ddff" },
-  { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800" },
-  { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
-  { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
-  { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355" },
-  { id: "wildcard", name: "WILDCARD", desc: "5 cards in the deck are wild — any guess is correct.", color: "#ffd700" },
-  { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600" },
-  { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff" },
-  { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom card of the deck.", color: "#ddaa00" },
-  ];
-
-const CURSED_JOKERS = [
-  { id: "sticky", name: "STICKY BUTTONS", desc: "Piles must be guessed left to right — you cannot choose.", color: "#cc2222", cursed: true },
-  { id: "gambler", name: "THE GAMBLER", desc: "All scores ×2. Wrong guesses kill 2 piles.", color: "#cc2222", cursed: true },
-  { id: "royallyscrewed", name: "ROYALLY SCREWED", desc: "The deck has twice as many face cards (J/Q/K).", color: "#cc2222", cursed: true },
-  { id: "hardwayout", name: "HARD WAY OUT", desc: "Every 5th guess, you cannot pick the highest-probability option.", color: "#cc2222", cursed: true },
-  { id: "reshuffle", name: "AUTO-RESHUFFLE", desc: "Piles auto-shuffle when 13+ cards.", color: "#cc2222", cursed: true },
-  { id: "smaller", name: "A LITTLE SMALLER", desc: "No 6s. Each of 2,3,4,5 appears 5 times instead of 4.", color: "#cc2222", cursed: true },
-  { id: "bigger", name: "A LITTLE BIGGER", desc: "No 8s. Each of 9,10,J,Q appears 5 times instead of 4.", color: "#cc2222", cursed: true },
-  { id: "dyslexic", name: "DYSLEXIC", desc: "All 2s become 5s.", color: "#cc2222", cursed: true },
-  { id: "sevennine", name: "SEVEN ATE NINE", desc: "All 9s become 7s.", color: "#cc2222", cursed: true },
-];
-
-const pickJokerOptions = (owned, round) => {
-  if (round % 3 === 2) {
-    const alreadyOwned = owned.filter((j) => j.cursed).map((j) => j.id);
-    const available = CURSED_JOKERS.filter((j) => !alreadyOwned.includes(j.id));
-    const pool = available.length >= 2 ? available : CURSED_JOKERS;
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 2);
-  }
-  const available = ALL_JOKERS.filter((j) => !owned.find((o) => o.id === j.id));
-  const shuffled = [...available].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(3, shuffled.length));
-};
-
-// ===== Probability for a guess (uses remaining deck) =====
-const guessProbability = (top, direction, deckRemaining) => {
-  if (deckRemaining.length === 0) return 0;
-  const topIsAce = top.rank === "A";
-  const topLow = topIsAce ? 1 : RANK_VALUE[top.rank];
-  const topHigh = topIsAce ? 14 : RANK_VALUE[top.rank];
-
-  let favorable = 0;
-  for (const c of deckRemaining) {
-    if (c.wild) { favorable++; continue; } // wild cards always favorable
-    const cIsAce = c.rank === "A";
-    const cLow = cIsAce ? 1 : RANK_VALUE[c.rank];
-    const cHigh = cIsAce ? 14 : RANK_VALUE[c.rank];
-    if (direction === "higher" && cHigh > topLow && c.rank !== top.rank) favorable++;
-    else if (direction === "lower" && cLow < topHigh && c.rank !== top.rank) favorable++;
-    else if (direction === "same" && c.rank === top.rank) favorable++;
-  }
-  return favorable / deckRemaining.length;
-};
-
-// Compute base score before card-conditional jokers — this is the guaranteed
-// floor if the guess is correct.
-const previewScore = (pile, direction, deck, ownedJokers, streak, aliveCount, correctCount) => {
-  const has = (id) => ownedJokers.some((j) => j.id === id);
-  const top = pile[pile.length - 1];
-  const newDepth = pile.length + 1;
-  const stackBonus = newDepth - 1;
-  const base = direction === "same" ? 50 : 10 * Math.max(1, stackBonus);
-  const prob = guessProbability(top, direction, deck);
-
-  // Multipliers that apply regardless of next card
-  let unconditionalMult = 1;
-  const unconditional = [];
-  if (has("gambler")) {
-    unconditionalMult *= 2;
-    unconditional.push("Gambler ×2");
-  }
-  if (has("laststand") && aliveCount === 1) {
-    unconditionalMult *= 5;
-    unconditional.push("Last Stand ×5");
-  }
-  if (has("underdog") && prob < 0.25 && prob > 0) {
-    unconditionalMult *= 2;
-    unconditional.push("Underdog ×2");
-  }
-  if (has("surething") && prob >= 0.75) {
-    unconditionalMult *= 1.5;
-    unconditional.push("Sure Thing ×1.5");
-  }
-  if (has("compound") && (correctCount + 1) % 5 === 0) {
-    unconditionalMult *= 5;
-    unconditional.push("Compound ×5");
-  }
-  if (has("777") && top.rank === "7") {
-    unconditionalMult *= 3;
-    unconditional.push("Lucky 7 ×3");
-  }
-  if (has("even") && EVEN_RANKS.has(top.rank)) {
-    unconditionalMult *= 2;
-    unconditional.push("Even Steven ×2");
-  }
-
-  const conditional = [];
-
-  // Streak
-  const projectedStreak = streak + 1;
-  const streakMult = Math.min(1 + Math.floor(projectedStreak / 3), 5);
-
-  const guaranteedScore = Math.floor(base * unconditionalMult * streakMult);
-  return {
-    prob,
-    base,
-    unconditionalMult,
-    unconditional,
-    conditional,
-    streakMult,
-    guaranteedScore,
-  };
-};
-
-// ===== Card counter from deck =====
-const countByRank = (deck) => {
-  const counts = {};
-  for (const r of RANKS) counts[r] = 0;
-  for (const c of deck) counts[c.rank]++;
-  return counts;
-};
-
-// ===== Robot face =====
 function RobotFace() {
   return (
     <svg viewBox="0 0 16 22" shapeRendering="crispEdges" style={{ width: "70%", height: "70%" }}>
@@ -177,8 +50,7 @@ function RobotFace() {
   );
 }
 
-// ===== Card =====
-function Card({ card, faceDown, dim, peelCard }) {
+function Card({ card, faceDown, dim, peelCard }: CardProps) {
   if (!card && !faceDown) {
     return (
       <div
@@ -284,6 +156,8 @@ function Card({ card, faceDown, dim, peelCard }) {
     );
   }
 
+  if (!card) return null;
+
   const isRed = card.suit === "♥" || card.suit === "♦";
   const isWild = card.wild;
   return (
@@ -342,14 +216,24 @@ function Card({ card, faceDown, dim, peelCard }) {
   );
 }
 
-// ===== Chunky button =====
-function DOSButton({ children, onClick, disabled, variant = "default", small, full }) {
-  const colors = {
+type ButtonVariant = "default" | "primary" | "danger" | "success";
+
+interface DOSButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: ButtonVariant;
+  small?: boolean;
+  full?: boolean;
+}
+
+function DOSButton({ children, onClick, disabled, variant = "default", small, full }: DOSButtonProps) {
+  const colors: Record<ButtonVariant, { bg: string; fg: string }> = {
     default: { bg: "#c0c0c0", fg: "#000" },
     primary: { bg: "#ffff00", fg: "#000" },
     danger: { bg: "#ff5555", fg: "#000" },
     success: { bg: "#00ffaa", fg: "#000" },
-  }[variant];
+  };
 
   return (
     <button
@@ -357,8 +241,8 @@ function DOSButton({ children, onClick, disabled, variant = "default", small, fu
       disabled={disabled}
       className="active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform"
       style={{
-        background: disabled ? "#888" : colors.bg,
-        color: colors.fg,
+        background: disabled ? "#888" : colors[variant].bg,
+        color: colors[variant].fg,
         border: "2px solid #000",
         boxShadow: disabled ? "none" : "3px 3px 0 #000",
         padding: small ? "6px 8px" : "10px 14px",
@@ -376,8 +260,18 @@ function DOSButton({ children, onClick, disabled, variant = "default", small, fu
   );
 }
 
-// ===== Joker card =====
-function JokerCard({ joker, onSelect, selectable, small, depleted, blinking, active, counter }) {
+interface JokerCardProps {
+  joker: Joker;
+  onSelect?: () => void;
+  selectable?: boolean;
+  small?: boolean;
+  depleted?: boolean;
+  blinking?: boolean;
+  active?: boolean;
+  counter?: number;
+}
+
+function JokerCard({ joker, onSelect, selectable, small, depleted, blinking, active, counter }: JokerCardProps) {
   return (
     <button
       onClick={onSelect}
@@ -447,22 +341,20 @@ function JokerCard({ joker, onSelect, selectable, small, depleted, blinking, act
 }
 
 export default function BeatTheRobot() {
-  // Run state
-  const [phase, setPhase] = useState("playing");
+  const [phase, setPhase] = useState<GamePhase>("playing");
   const [round, setRound] = useState(1);
   const [runScore, setRunScore] = useState(0);
-  const [ownedJokers, setOwnedJokers] = useState([]);
-  const [jokerOptions, setJokerOptions] = useState([]);
-  const [jokerInfo, setJokerInfo] = useState(null);
+  const [ownedJokers, setOwnedJokers] = useState<Joker[]>([]);
+  const [jokerOptions, setJokerOptions] = useState<Joker[]>([]);
+  const [jokerInfo, setJokerInfo] = useState<Joker | null>(null);
 
-  // Round state
-  const [deck, setDeck] = useState([]);
-  const [piles, setPiles] = useState([]);
-  const [deadPiles, setDeadPiles] = useState([]);
-  const [selectedPile, setSelectedPile] = useState(null);
-  const [jokerBlink, setJokerBlink] = useState(null); // "sticky" | "hardwayout" | null
-  const blinkTimeoutRef = useRef(null);
-  const triggerJokerBlink = (jokerId) => {
+  const [deck, setDeck] = useState<Card[]>([]);
+  const [piles, setPiles] = useState<Card[][]>([]);
+  const [deadPiles, setDeadPiles] = useState<boolean[]>([]);
+  const [selectedPile, setSelectedPile] = useState<number | null>(null);
+  const [jokerBlink, setJokerBlink] = useState<string | null>(null);
+  const blinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerJokerBlink = (jokerId: string) => {
     if (blinkTimeoutRef.current) clearTimeout(blinkTimeoutRef.current);
     setJokerBlink(jokerId);
     blinkTimeoutRef.current = setTimeout(() => {
@@ -473,41 +365,38 @@ export default function BeatTheRobot() {
   const [message, setMessage] = useState("");
   const [roundScore, setRoundScore] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [flashPile, setFlashPile] = useState(null);
-  const [flashKind, setFlashKind] = useState(null);
-  const [floaters, setFloaters] = useState([]); // {id, pileIdx, text, color, isEmoji}
-  const [luckyFirePile, setLuckyFirePile] = useState(null); // pile idx for lucky guess fire animation
-  const [streakPulse, setStreakPulse] = useState(0); // increments to retrigger pulse animation
+  const [flashPile, setFlashPile] = useState<number | null>(null);
+  const [flashKind, setFlashKind] = useState<string | null>(null);
+  const [floaters, setFloaters] = useState<Floater[]>([]);
+  const [, setLuckyFirePile] = useState<number | null>(null);
+  const [streakPulse, setStreakPulse] = useState(0);
   const [scorePulse, setScorePulse] = useState(0);
-  const [newCardPile, setNewCardPile] = useState(null); // pile idx for slide-in animation
+  const [newCardPile, setNewCardPile] = useState<number | null>(null);
 
-  // Joker per-round state
   const [phoenixUsed, setPhoenixUsed] = useState(false);
-  const [phoenixCounter, setPhoenixCounter] = useState(0); // counts correct guesses since first death
-  const [phoenixTarget, setPhoenixTarget] = useState(null); // pile idx to revive
-  const [compoundCounter, setCompoundCounter] = useState(4); // counts down from 4 for compound int
-  const [hardWayCounter, setHardWayCounter] = useState(4); // counts down from 4 for hard way out
-  const [correctCount, setCorrectCount] = useState(0); // for compound interest
-  const [hotStreak, setHotStreak] = useState(1); // cumulative probability for Lucky Guess
+  const [phoenixCounter, setPhoenixCounter] = useState(0);
+  const [phoenixTarget, setPhoenixTarget] = useState<number | null>(null);
+  const [compoundCounter, setCompoundCounter] = useState(4);
+  const [hardWayCounter, setHardWayCounter] = useState(4);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [hotStreak, setHotStreak] = useState(1);
   const [guessCount, setGuessCount] = useState(0);
   const [showRules, setShowRules] = useState(false);
   const [rulesClosing, setRulesClosing] = useState(false);
-  const helpBtnRef = useRef(null);
-  const [helpBtnPos, setHelpBtnPos] = useState(null); // {x, y} for shrink target
+  const helpBtnRef = useRef<HTMLButtonElement>(null);
+  const [helpBtnPos, setHelpBtnPos] = useState<HelpBtnPos | null>(null);
 
-  // Dev mode
   const [devMode, setDevMode] = useState(false);
   const [devRoundInput, setDevRoundInput] = useState("1");
   const [devSidebarWidth, setDevSidebarWidth] = useState(180);
   const [isResizing, setIsResizing] = useState(false);
 
-  // Swipe tracking (mobile)
-  const swipeStart = useRef(null);
-  const [swipeDir, setSwipeDir] = useState(null); // 'up' | 'down' for visual feedback
-  const [swipeOffset, setSwipeOffset] = useState(null); // {pileIdx, dy}
+  const swipeStart = useRef<{ x: number; y: number; pileIdx: number } | null>(null);
+  const [, setSwipeDir] = useState<string | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState<SwipeOffset | null>(null);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
-  const hasJoker = (id) => ownedJokers.some((j) => j.id === id);
+  const hasJoker = (id: string): boolean => ownedJokers.some((j) => j.id === id);
 
   useEffect(() => {
     if (!document.getElementById("vt323-font")) {
@@ -519,7 +408,6 @@ export default function BeatTheRobot() {
     }
   }, []);
 
-  // Detect dev mode from URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("dev") === "true") {
@@ -527,10 +415,9 @@ export default function BeatTheRobot() {
     }
   }, []);
 
-  // Sidebar resize handling
   useEffect(() => {
     if (!isResizing) return;
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       const newWidth = Math.max(120, Math.min(400, e.clientX));
       setDevSidebarWidth(newWidth);
     };
@@ -545,23 +432,21 @@ export default function BeatTheRobot() {
 
   const target = ROUND_TARGETS[round - 1];
 
-  const startRound = (roundNum) => {
-    let deck = buildDeck();
-    // Royally Screwed: add extra face cards to deck
+  const startRound = (roundNum: number) => {
+    let deck: Card[] = buildDeck();
     if (hasJoker("royallyscrewed")) {
       const faceRanks = ["J", "Q", "K"];
       const suits = ["♠", "♥", "♦", "♣"];
       const extraFaces = faceRanks.flatMap((r) => suits.map((s) => ({ rank: r, suit: s })));
       extraFaces.sort(() => Math.random() - 0.5);
-      const nonFaceIdxs = deck.map((c, i) => i).filter((i) => !faceRanks.includes(deck[i].rank));
+      const nonFaceIdxs = deck.map((_c, i) => i).filter((i) => !faceRanks.includes(deck[i].rank));
       nonFaceIdxs.sort(() => Math.random() - 0.5);
       nonFaceIdxs.slice(0, 12).forEach((deckIdx, i) => { deck[deckIdx] = extraFaces[i]; });
       deck.sort(() => Math.random() - 0.5);
     }
 
-    // A Little Smaller: no 6s, extra 2-5
     if (hasJoker("smaller")) {
-      let filtered = deck.filter(c => c.rank !== "6");
+      const filtered = deck.filter(c => c.rank !== "6");
       ["5", "4", "3", "2"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
       for (let i = filtered.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -570,9 +455,8 @@ export default function BeatTheRobot() {
       deck = filtered;
     }
 
-    // A Little Bigger: no 8s, extra 9-Q
     if (hasJoker("bigger")) {
-      let filtered = deck.filter(c => c.rank !== "8");
+      const filtered = deck.filter(c => c.rank !== "8");
       ["Q", "J", "10", "9"].forEach((r, i) => filtered.push({ rank: r, suit: SUITS[i % 4] }));
       for (let i = filtered.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -581,25 +465,25 @@ export default function BeatTheRobot() {
       deck = filtered;
     }
 
-    // Dyslexic: all 2s become 5s
     if (hasJoker("dyslexic")) {
       deck = deck.map(c => c.rank === "2" ? { ...c, rank: "5" } : c);
     }
 
-    // Seven Ate Nine: all 9s become 7s
     if (hasJoker("sevennine")) {
       deck = deck.map(c => c.rank === "9" ? { ...c, rank: "7" } : c);
     }
 
-    // Wildcard: mark 5 random cards as wild
     if (hasJoker("wildcard")) {
-      const indices = new Set();
+      const indices = new Set<number>();
       while (indices.size < 5) indices.add(Math.floor(Math.random() * deck.length));
       deck = deck.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
     }
 
-    const initial = [];
-    for (let i = 0; i < 9; i++) initial.push([deck.shift()]);
+    const initial: Card[][] = [];
+    for (let i = 0; i < 9; i++) {
+      const card = deck.shift();
+      if (card) initial.push([card]);
+    }
     setPiles(initial);
     setDeadPiles(Array(9).fill(false));
     setDeck(deck);
@@ -631,7 +515,6 @@ export default function BeatTheRobot() {
     startNewRun();
   }, []);
 
-  // Detect touch device on mount
   useEffect(() => {
     const touchy =
       "ontouchstart" in window ||
@@ -640,7 +523,6 @@ export default function BeatTheRobot() {
     setIsTouchDevice(touchy);
   }, []);
 
-  // Show help on first visit ever
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -651,7 +533,6 @@ export default function BeatTheRobot() {
           setShowRules(true);
         }
       } catch {
-        // First time — key doesn't exist
         if (!cancelled) setShowRules(true);
       }
     })();
@@ -660,29 +541,25 @@ export default function BeatTheRobot() {
     };
   }, []);
 
-  // Auto-clear transient messages after 3.5s so the formula line breathes
   useEffect(() => {
     if (!message) return;
     const t = setTimeout(() => setMessage(""), 3500);
     return () => clearTimeout(t);
   }, [message]);
 
-  // Sticky: keep selectedPile on leftmost alive pile
   useEffect(() => {
     if (hasJoker("sticky") && phase === "playing") {
       const leftmostAlive = deadPiles.findIndex((d) => !d);
       setSelectedPile(leftmostAlive === -1 ? null : leftmostAlive);
     }
-  }, [deadPiles, phase]);
+  }, [deadPiles, phase, ownedJokers]);
 
   const aliveCount = deadPiles.filter((d) => !d).length;
   const rankCounts = useMemo(() => countByRank(deck), [deck]);
   const bottomCard = deck.length > 0 ? deck[deck.length - 1] : null;
 
-  // ===== Pile click =====
-  const handlePileClick = (idx) => {
+  const handlePileClick = (idx: number) => {
     if (phase !== "playing") return;
-    // Sticky: pile selection is locked
     if (hasJoker("sticky") && selectedPile !== null && idx !== selectedPile) {
       triggerJokerBlink("sticky");
       return;
@@ -691,8 +568,7 @@ export default function BeatTheRobot() {
     if (deadPiles[idx]) return;
     setSelectedPile(idx);
 
-    // Show context about active conditional jokers if any
-    const conditionals = [];
+    const conditionals: string[] = [];
     if (hasJoker("777")) conditionals.push("L7×3 guessing on a 7");
     if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q top");
     if (conditionals.length > 0) {
@@ -702,21 +578,18 @@ export default function BeatTheRobot() {
     }
   };
 
-  // ===== Guess =====
-  const guess = (direction, explicitPileIdx) => {
+  const guess = (direction: Direction, explicitPileIdx?: number) => {
     if (phase !== "playing") return;
     setGuessCount((c) => c + 1);
     let idx = explicitPileIdx !== undefined ? explicitPileIdx : selectedPile;
     if (idx === null || idx === undefined) return;
     if (deadPiles[idx]) return;
 
-    // Sticky pile forcing
     if (hasJoker("sticky")) {
       idx = piles.findIndex((_, i) => !deadPiles[i]);
       if (idx === -1) return;
     }
 
-    // Hard Way Out - block highest probability guess on every 5th guess
     if (hasJoker("hardwayout")) {
       if ((guessCount + 1) % 5 === 0) {
         const top = piles[idx][piles[idx].length - 1];
@@ -742,6 +615,7 @@ export default function BeatTheRobot() {
 
     const topIsAce = top.rank === "A";
     const nextIsAce = next.rank === "A";
+    const RANK_VALUE: Record<string, number> = { A: 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, J: 11, Q: 12, K: 13 };
     const topLow = topIsAce ? 1 : RANK_VALUE[top.rank];
     const topHigh = topIsAce ? 14 : RANK_VALUE[top.rank];
     const nextLow = nextIsAce ? 1 : RANK_VALUE[next.rank];
@@ -758,17 +632,18 @@ export default function BeatTheRobot() {
     setPiles(newPiles);
     setDeck(remainingDeck);
 
-    // Auto-shuffle for reshuffle joker: if pile has 13+ cards, shuffle back into deck
     if (hasJoker("reshuffle") && newPiles[idx].length >= 13) {
-      const pileCards = newPiles[idx].slice(0, -1); // keep the top card, put rest back
+      const pileCards = newPiles[idx].slice(0, -1);
       const reshuffleDeck = [...remainingDeck, ...pileCards];
       for (let i = reshuffleDeck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [reshuffleDeck[i], reshuffleDeck[j]] = [reshuffleDeck[j], reshuffleDeck[i]];
       }
       const newCard = reshuffleDeck.shift();
-      const autoShuffledPiles = newPiles.map((p, i) => (i === idx ? [p[p.length - 1], newCard] : p));
-      setPiles(autoShuffledPiles);
+      if (newCard) {
+        const autoShuffledPiles = newPiles.map((p, i) => (i === idx ? [p[p.length - 1], newCard] : p));
+        setPiles(autoShuffledPiles);
+      }
       setDeck(reshuffleDeck);
       setMessage(`*** AUTO-RESHUFFLE! Pile ${idx + 1} shuffled. ***`);
     }
@@ -776,11 +651,10 @@ export default function BeatTheRobot() {
     if (correct) {
       const newDepth = newPiles[idx].length;
       const stackBonus = newDepth - 1;
-      let base = direction === "same" ? 50 : 10 * Math.max(1, stackBonus);
+      const base = direction === "same" ? 50 : 10 * Math.max(1, stackBonus);
 
-      // ===== Joker multipliers =====
       let mult = 1;
-      const breakdown = [];
+      const breakdown: string[] = [];
 
       if (isWild) breakdown.push("WILD★");
 
@@ -821,13 +695,11 @@ export default function BeatTheRobot() {
       }
       setCorrectCount(newCorrectCount);
 
-      // Streak
       const newStreak = streak + 1;
       const streakMult = Math.min(1 + Math.floor(newStreak / 3), 5);
       setStreak(newStreak);
       setStreakPulse((p) => p + 1);
 
-      // Lucky Guess: update hot streak and trigger if < 10%
       if (hasJoker("luckyguess")) {
         const newHot = hotStreak * probability;
         setHotStreak(newHot);
@@ -851,13 +723,12 @@ export default function BeatTheRobot() {
       setRoundScore((s) => s + earned);
       setScorePulse((p) => p + 1);
 
-      // Floating score popup
       const floaterId = Date.now() + Math.random();
       const floaterText =
         breakdown.length > 0
           ? `+${earned}\n${breakdown.join(" ")}`
           : `+${earned}`;
-      setFloaters((f) => [...f, { id: floaterId, pileIdx: idx, text: floaterText, color: "#00ff66" }]);
+      setFloaters((f) => [...f, { id: floaterId, pileIdx: idx, text: floaterText, color: "#00ff66", isEmoji: false }]);
       setTimeout(() => {
         setFloaters((f) => f.filter((x) => x.id !== floaterId));
       }, 1600);
@@ -872,7 +743,6 @@ export default function BeatTheRobot() {
         setFlashKind(null);
       }, 550);
 
-      // SAME revives all dead piles
       let revived = 0;
       let newDeadAfter = deadPiles;
       if (direction === "same") {
@@ -880,11 +750,10 @@ export default function BeatTheRobot() {
         if (revived > 0) {
           newDeadAfter = Array(9).fill(false);
           setDeadPiles(newDeadAfter);
-          setPhoenixTarget(null); // already revived
+          setPhoenixTarget(null);
         }
       }
 
-      // Phoenix tick
       if (hasJoker("phoenix") && !phoenixUsed && phoenixTarget !== null) {
         const newCounter = phoenixCounter + 1;
         if (newCounter >= 3) {
@@ -900,7 +769,6 @@ export default function BeatTheRobot() {
 
       const newRoundScore = roundScore + earned;
 
-      // Round cleared
       if (newRoundScore >= target) {
         setRunScore((rs) => rs + newRoundScore);
         if (round >= ROUND_TARGETS.length) {
@@ -928,16 +796,12 @@ export default function BeatTheRobot() {
       if (streakMult > 1) msg += ` ×${streakMult} streak`;
       if (direction === "same" && revived > 0) msg += ` — ${revived} revived!`;
       setMessage(msg);
-      // Keep the pile selected so desktop players don't need to re-click after each guess.
     } else {
-      // Wrong guess
       setStreak(0);
       setHotStreak(1);
 
-      // Determine kills (Gambler kills 2)
       const killCount = hasJoker("gambler") ? 2 : 1;
       let newDead = deadPiles.map((d, i) => (i === idx ? true : d));
-      // Pick additional pile to kill (random alive)
       if (killCount > 1) {
         const aliveIndices = newDead
           .map((d, i) => (!d ? i : -1))
@@ -948,7 +812,6 @@ export default function BeatTheRobot() {
         }
       }
 
-      // Phoenix tracks first death
       if (hasJoker("phoenix") && !phoenixUsed && phoenixTarget === null) {
         setPhoenixTarget(idx);
         setPhoenixCounter(0);
@@ -962,9 +825,8 @@ export default function BeatTheRobot() {
         setFlashKind(null);
       }, 850);
 
-      // Miss floater
       const missId = Date.now() + Math.random();
-      setFloaters((f) => [...f, { id: missId, pileIdx: idx, text: "MISS", color: "#ff5555" }]);
+      setFloaters((f) => [...f, { id: missId, pileIdx: idx, text: "MISS", color: "#ff5555", isEmoji: false }]);
       setTimeout(() => {
         setFloaters((f) => f.filter((x) => x.id !== missId));
       }, 1600);
@@ -1001,13 +863,11 @@ export default function BeatTheRobot() {
       if (killCount > 1) msg += ` Gambler killed another!`;
       msg += ` ${remainingAlive} alive.`;
       setMessage(msg);
-      // Pile is dead — advance to next alive pile so desktop players don't lose selection.
       const nextAlive = newDead.findIndex((d, i) => !d && i > idx) !== -1
         ? newDead.findIndex((d, i) => !d && i > idx)
         : newDead.findIndex((d) => !d);
       setSelectedPile(nextAlive === -1 ? null : nextAlive);
 
-      // Sticky: force to leftmost alive pile after any wrong guess
       if (hasJoker("sticky")) {
         const leftmost = newDead.findIndex((d) => !d);
         setSelectedPile(leftmost === -1 ? null : leftmost);
@@ -1015,7 +875,7 @@ export default function BeatTheRobot() {
     }
   };
 
-  const chooseJoker = (joker) => {
+  const chooseJoker = (joker: Joker) => {
     const newJokers = [...ownedJokers, joker];
     setOwnedJokers(newJokers);
     const nextRound = round + 1;
@@ -1023,7 +883,6 @@ export default function BeatTheRobot() {
     setTimeout(() => startRound(nextRound), 0);
   };
 
-  // Close rules modal with shrink-to-help-button animation
   const closeRules = () => {
     if (helpBtnRef.current) {
       const r = helpBtnRef.current.getBoundingClientRect();
@@ -1033,7 +892,6 @@ export default function BeatTheRobot() {
       });
     }
     setRulesClosing(true);
-    // Mark intro as seen
     (async () => {
       try {
         await window.storage.set("hasSeenIntro", "1");
@@ -1046,12 +904,11 @@ export default function BeatTheRobot() {
     }, 350);
   };
 
-  // Helper: cycle selection among alive piles
-  const cycleSelection = (delta) => {
+  const cycleSelection = (delta: number) => {
     if (phase !== "playing") return;
     const alive = deadPiles.map((d, i) => (!d ? i : -1)).filter((i) => i !== -1);
     if (alive.length === 0) return;
-    let nextIdx;
+    let nextIdx: number;
     if (selectedPile === null) {
       nextIdx = delta > 0 ? alive[0] : alive[alive.length - 1];
     } else {
@@ -1063,7 +920,7 @@ export default function BeatTheRobot() {
       }
     }
     setSelectedPile(nextIdx);
-    const conditionals = [];
+    const conditionals: string[] = [];
     if (hasJoker("777")) conditionals.push("L7×3 guessing on a 7");
     if (hasJoker("even")) conditionals.push("EVEN×2 on 2/4/6/8/10/Q top");
     if (conditionals.length > 0) {
@@ -1073,12 +930,10 @@ export default function BeatTheRobot() {
     }
   };
 
-  // Keyboard input
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (phase !== "playing") return;
       if (showRules) return;
-      // Pile selection by number
       if (/^[1-9]$/.test(e.key)) {
         const idx = parseInt(e.key, 10) - 1;
         if (!deadPiles[idx]) {
@@ -1098,7 +953,6 @@ export default function BeatTheRobot() {
           break;
         case "ArrowUp":
           if (selectedPile !== null) {
-            // Hard Way Out check for keyboard
             if (hasJoker("hardwayout") && (guessCount + 1) % 5 === 0) {
               const top = piles[selectedPile][piles[selectedPile].length - 1];
               const probH = guessProbability(top, "higher", deck);
@@ -1115,7 +969,6 @@ export default function BeatTheRobot() {
           break;
         case "ArrowDown":
           if (selectedPile !== null) {
-            // Hard Way Out check for keyboard
             if (hasJoker("hardwayout") && (guessCount + 1) % 5 === 0) {
               const top = piles[selectedPile][piles[selectedPile].length - 1];
               const probH = guessProbability(top, "higher", deck);
@@ -1144,12 +997,9 @@ export default function BeatTheRobot() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, selectedPile, deadPiles, piles, deck, showRules]);
+  }, [phase, selectedPile, deadPiles, piles, deck, showRules, ownedJokers]);
 
-  // Swipe-from-pile: track which pile the touch started on, follow finger,
-  // release to commit guess. The card itself moves with the finger.
-  const onPileTouchStart = (i) => (e) => {
+  const onPileTouchStart = (i: number) => (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     if (deadPiles[i] || phase !== "playing") return;
     if (hasJoker("sticky") && selectedPile !== null && i !== selectedPile) {
@@ -1160,18 +1010,15 @@ export default function BeatTheRobot() {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
       pileIdx: i,
-      committed: false,
     };
     setSwipeOffset({ pileIdx: i, dy: 0 });
     setSwipeDir(null);
   };
-  const onPileTouchMove = (e) => {
+  const onPileTouchMove = (e: React.TouchEvent) => {
     if (!swipeStart.current || e.touches.length !== 1) return;
     const dy = e.touches[0].clientY - swipeStart.current.y;
     const dx = e.touches[0].clientX - swipeStart.current.x;
-    // Only follow vertical motion; ignore horizontal gestures
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
-      // user is scrolling/swiping horizontally — abort
       swipeStart.current = null;
       setSwipeOffset(null);
       setSwipeDir(null);
@@ -1185,7 +1032,7 @@ export default function BeatTheRobot() {
     }
     e.preventDefault();
   };
-  const onPileTouchEnd = (e) => {
+  const onPileTouchEnd = (e: React.TouchEvent) => {
     if (!swipeStart.current) return;
     const t = e.changedTouches[0];
     const dy = t.clientY - swipeStart.current.y;
@@ -1195,7 +1042,6 @@ export default function BeatTheRobot() {
     setSwipeOffset(null);
     setSwipeDir(null);
 
-    // Trigger threshold for a flick
     const FLICK_THRESHOLD = 50;
     if (
       Math.abs(dy) > FLICK_THRESHOLD &&
@@ -1203,9 +1049,7 @@ export default function BeatTheRobot() {
       !deadPiles[pileIdx] &&
       phase === "playing"
     ) {
-      // Auto-select the pile and guess in one motion
       const direction = dy < 0 ? "higher" : "lower";
-      // Hard Way Out check for swipe
       if (hasJoker("hardwayout") && (guessCount + 1) % 5 === 0) {
         const top = piles[pileIdx][piles[pileIdx].length - 1];
         const probH = guessProbability(top, "higher", deck);
@@ -1222,7 +1066,6 @@ export default function BeatTheRobot() {
       setSelectedPile(pileIdx);
       guess(direction, pileIdx);
     } else {
-      // Tap (no flick) — just select the pile
       if (Math.abs(dy) < 10 && Math.abs(dx) < 10 && !deadPiles[pileIdx]) {
         handlePileClick(pileIdx);
       }
@@ -1310,7 +1153,6 @@ export default function BeatTheRobot() {
           transition: "padding-left 0.2s ease",
         }}
       >
-        {/* Title bar */}
         <div
           style={{
             background: "#000080",
@@ -1351,7 +1193,6 @@ export default function BeatTheRobot() {
           </div>
         </div>
 
-        {/* Score panel */}
         <div
           style={{
             background: "#c0c0c0",
@@ -1406,7 +1247,6 @@ export default function BeatTheRobot() {
           </div>
         </div>
 
-        {/* Card Counter (joker) */}
         {hasJoker("counter") && (
           <div
             style={{
@@ -1432,7 +1272,6 @@ export default function BeatTheRobot() {
           </div>
         )}
 
-        {/* Dead Reckoning (joker) */}
         {hasJoker("deadreck") && bottomCard && (
           <div
             style={{
@@ -1464,7 +1303,6 @@ export default function BeatTheRobot() {
           </div>
         )}
 
-        {/* Owned jokers strip */}
         {ownedJokers.length > 0 && (
           <div style={{ marginBottom: 8, flexShrink: 0 }}>
             {ownedJokers.filter(j => !j.cursed).length > 0 && (
@@ -1527,7 +1365,6 @@ export default function BeatTheRobot() {
           </div>
         )}
 
-        {/* 3x3 grid — flick cards up/down to guess */}
         {phase === "playing" && (
           <div
             style={{
@@ -1555,7 +1392,6 @@ export default function BeatTheRobot() {
 
             const isBeingDragged = swipeOffset && swipeOffset.pileIdx === i;
             const dragDy = isBeingDragged ? swipeOffset.dy : 0;
-            // Cap visual movement to avoid weird overflow
             const visualDy = Math.max(-120, Math.min(120, dragDy));
             const dragRotation = isBeingDragged ? visualDy * 0.1 : 0;
             const dragOpacity = isBeingDragged ? Math.max(0.6, 1 - Math.abs(visualDy) / 300) : 1;
@@ -1618,7 +1454,6 @@ export default function BeatTheRobot() {
                 >
                   <Card card={top} faceDown={isDead} dim={isDead} peelCard={isDead ? top : null} />
                 </div>
-                {/* Direction hint that follows the dragged card */}
                 {isBeingDragged && Math.abs(dragDy) > 25 && (
                   <div
                     style={{
@@ -1676,7 +1511,6 @@ export default function BeatTheRobot() {
                     🔥{3 - phoenixCounter}
                   </div>
                 )}
-                {/* Floating score popups */}
                 {pileFloaters.map((f) => (
                   <div
                     key={f.id}
@@ -1707,7 +1541,6 @@ export default function BeatTheRobot() {
           </div>
         )}
 
-        {/* Guess controls with score previews */}
         {phase === "playing" && (() => {
           const previews = selectedPile !== null
             ? {
@@ -1717,11 +1550,10 @@ export default function BeatTheRobot() {
               }
             : null;
 
-          const renderBtn = (dir, label, variant, keyHint) => {
+          const renderBtn = (dir: Direction, label: string, variant: ButtonVariant, keyHint: string | undefined) => {
             const p = previews?.[dir];
-            // Hard Way Out: disable highest probability guess on every 5th guess
             const isHardWayRestricted = hasJoker("hardwayout") && (guessCount + 1) % 5 === 0 && selectedPile !== null;
-            let restrictedDir = null;
+            let restrictedDir: Direction | null = null;
             if (isHardWayRestricted) {
               const top = piles[selectedPile][piles[selectedPile].length - 1];
               const probH = guessProbability(top, "higher", deck);
@@ -1730,11 +1562,12 @@ export default function BeatTheRobot() {
             }
             const hardWayDisabled = dir === restrictedDir;
             const disabled = selectedPile === null || hardWayDisabled;
-            const colors = {
+            const colors: Record<ButtonVariant, { bg: string; fg: string }> = {
               default: { bg: "#c0c0c0", fg: "#000" },
               primary: { bg: "#ffff00", fg: "#000" },
               danger: { bg: "#ff5555", fg: "#000" },
-            }[variant];
+              success: { bg: "#00ffaa", fg: "#000" },
+            };
             return (
               <button
                 onClick={() => {
@@ -1747,8 +1580,8 @@ export default function BeatTheRobot() {
                 disabled={selectedPile === null}
                 className="active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform"
                 style={{
-                  background: disabled ? "#888" : colors.bg,
-                  color: colors.fg,
+                  background: disabled ? "#888" : colors[variant].bg,
+                  color: colors[variant].fg,
                   border: "2px solid #000",
                   boxShadow: disabled ? "none" : "3px 3px 0 #000",
                   padding: "8px 6px",
@@ -1985,7 +1818,6 @@ export default function BeatTheRobot() {
 
       </div>
 
-      {/* Dev mode panel */}
       {devMode && (
         <div
           style={{
@@ -2001,7 +1833,6 @@ export default function BeatTheRobot() {
             overflow: "auto",
           }}
         >
-          {/* Resize handle */}
           <div
             onMouseDown={(e) => {
               e.preventDefault();
@@ -2220,7 +2051,6 @@ export default function BeatTheRobot() {
         </div>
       )}
 
-      {/* Rules modal */}
       {showRules && (
         <div
           onClick={closeRules}
@@ -2314,7 +2144,6 @@ export default function BeatTheRobot() {
         </div>
       )}
 
-      {/* Joker info modal */}
       {jokerInfo && (
         <div
           onClick={() => setJokerInfo(null)}
