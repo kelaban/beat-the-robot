@@ -19,6 +19,7 @@
 9. **Stretch jokers across categories** — every joker pool offering should feel like a real choice between archetypes (multiplier vs. utility vs. info vs. comeback). Avoid duplicating effects within a tier.
 
 10. **Tactile feedback** — flick gestures, score floaters with breakdowns (`+240 [L7×3 GMB×2]`), pulse animations on score/streak ticks, card flip on death, peeled corner reveals. Every action should *feel* like something happened.
+   - Joker activation feedback: instant-trigger jokers blink when activated (777 on 7, Even Steven on even, Underdog on low-prob). State-based jokers show active highlight (gold border) when conditions are met (Last Stand when 1 pile, Compound Int on every 5th guess).
 
 11. **First-time onboarding** — rules modal opens automatically on first visit (persisted via storage), shrinks toward the `?` button on close so players know where to find it again.
 

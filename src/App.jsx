@@ -378,14 +378,14 @@ function DOSButton({ children, onClick, disabled, variant = "default", small, fu
 }
 
 // ===== Joker card =====
-function JokerCard({ joker, onSelect, selectable, small, depleted, blinking }) {
+function JokerCard({ joker, onSelect, selectable, small, depleted, blinking, active, counter }) {
   return (
     <button
       onClick={onSelect}
       disabled={!selectable}
       style={{
         background: "#1a1a2e",
-        border: `2px solid ${joker.color}`,
+        border: `2px solid ${active ? "#ffd700" : joker.color}`,
         boxShadow: `3px 3px 0 #000`,
         padding: small ? "4px 6px" : "8px 10px",
         cursor: selectable ? "pointer" : "default",
@@ -415,6 +415,20 @@ function JokerCard({ joker, onSelect, selectable, small, depleted, blinking }) {
         )}
       </div>
       {!small && <div style={{ fontSize: 14, lineHeight: 1.2, color: "#ddd" }}>{joker.desc}</div>}
+      {counter !== undefined && small && (
+        <div
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 4,
+            fontSize: 9,
+            color: counter === 0 ? "#ffd700" : "#888",
+            fontFamily: "'Press Start 2P', monospace",
+          }}
+        >
+          {counter === 0 ? "★" : counter}
+        </div>
+      )}
       {depleted && small && (
         <div
           style={{
@@ -472,6 +486,8 @@ export default function BeatTheRobot() {
   const [phoenixCounter, setPhoenixCounter] = useState(0); // counts correct guesses since first death
   const [phoenixTarget, setPhoenixTarget] = useState(null); // pile idx to revive
   const [bankedStreak, setBankedStreak] = useState(0); // combo breaker
+  const [compoundCounter, setCompoundCounter] = useState(4); // counts down from 4 for compound int
+  const [hardWayCounter, setHardWayCounter] = useState(4); // counts down from 4 for hard way out
   const [correctCount, setCorrectCount] = useState(0); // for compound interest
   const [hotStreak, setHotStreak] = useState(1); // cumulative probability for Lucky Guess
   const [guessCount, setGuessCount] = useState(0);
@@ -598,6 +614,8 @@ export default function BeatTheRobot() {
     setPhoenixCounter(0);
     setPhoenixTarget(null);
     setGuessCount(0);
+    setCompoundCounter(4);
+    setHardWayCounter(4);
     setMessage(`ROUND ${roundNum} — Reach ${ROUND_TARGETS[roundNum - 1]} pts.`);
     setFlashPile(null);
     setFlashKind(null);
@@ -701,14 +719,19 @@ export default function BeatTheRobot() {
     }
 
     // Hard Way Out - block highest probability guess on every 5th guess
-    if (hasJoker("hardwayout") && (guessCount + 1) % 5 === 0) {
-      const top = piles[idx][piles[idx].length - 1];
-      const probH = guessProbability(top, "higher", deck.slice(1));
-      const probL = guessProbability(top, "lower", deck.slice(1));
-      const restricted = probH >= probL ? "higher" : "lower";
-      if (direction === restricted) {
-        triggerJokerBlink("hardwayout");
-        return;
+    if (hasJoker("hardwayout")) {
+      if ((guessCount + 1) % 5 === 0) {
+        const top = piles[idx][piles[idx].length - 1];
+        const probH = guessProbability(top, "higher", deck.slice(1));
+        const probL = guessProbability(top, "lower", deck.slice(1));
+        const restricted = probH >= probL ? "higher" : "lower";
+        if (direction === restricted) {
+          triggerJokerBlink("hardwayout");
+          return;
+        }
+        setHardWayCounter(4);
+      } else {
+        setHardWayCounter((c) => Math.max(0, c - 1));
       }
     }
     const pile = piles[idx];
@@ -766,10 +789,12 @@ export default function BeatTheRobot() {
       if (hasJoker("777") && top.rank === "7") {
         mult *= 3;
         breakdown.push("L7×3");
+        triggerJokerBlink("777");
       }
       if (hasJoker("even") && EVEN_RANKS.has(top.rank)) {
         mult *= 2;
         breakdown.push("EVEN×2");
+        triggerJokerBlink("even");
       }
       if (hasJoker("gambler")) {
         mult *= 2;
@@ -782,6 +807,7 @@ export default function BeatTheRobot() {
       if (hasJoker("underdog") && probability < 0.25 && probability > 0) {
         mult *= 2;
         breakdown.push("UD×2");
+        triggerJokerBlink("underdog");
       }
       if (hasJoker("surething") && probability >= 0.75) {
         mult *= 1.5;
@@ -791,6 +817,9 @@ export default function BeatTheRobot() {
       if (hasJoker("compound") && newCorrectCount % 5 === 0) {
         mult *= 5;
         breakdown.push("CMP×5");
+        setCompoundCounter(4);
+      } else if (hasJoker("compound")) {
+        setCompoundCounter((c) => Math.max(0, c - 1));
       }
       setCorrectCount(newCorrectCount);
 
@@ -1444,6 +1473,8 @@ export default function BeatTheRobot() {
               >
                 {ownedJokers.filter(j => !j.cursed).map((j) => {
                   const depleted = j.id === "phoenix" && phoenixUsed;
+                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && (correctCount % 5 === 0 && correctCount > 0 || compoundCounter === 0));
+                  const counter = j.id === "compound" ? compoundCounter : undefined;
                   return (
                     <JokerCard
                       key={j.id}
@@ -1452,6 +1483,9 @@ export default function BeatTheRobot() {
                       depleted={depleted}
                       selectable
                       onSelect={() => setJokerInfo(j)}
+                      blinking={j.id === jokerBlink}
+                      active={isActive}
+                      counter={counter}
                     />
                   );
                 })}
@@ -1467,6 +1501,8 @@ export default function BeatTheRobot() {
               >
                 {ownedJokers.filter(j => j.cursed).map((j) => {
                   const depleted = j.id === "phoenix" && phoenixUsed;
+                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && (correctCount % 5 === 0 && correctCount > 0 || compoundCounter === 0)) || (j.id === "hardwayout" && (hardWayCounter === 0 || (guessCount + 1) % 5 === 0));
+                  const counter = j.id === "hardwayout" ? hardWayCounter : undefined;
                   return (
                     <JokerCard
                       key={j.id}
@@ -1476,6 +1512,8 @@ export default function BeatTheRobot() {
                       selectable
                       onSelect={() => setJokerInfo(j)}
                       blinking={j.id === jokerBlink}
+                      active={isActive}
+                      counter={counter}
                     />
                   );
                 })}
@@ -1663,58 +1701,6 @@ export default function BeatTheRobot() {
           })}
           </div>
         )}
-
-        {/* Terminal message */}
-        {phase === "playing" && (() => {
-          // Always-visible scoring formula reflecting current state.
-          const selPile = selectedPile !== null ? piles[selectedPile] : null;
-          const depth = selPile ? selPile.length : null;
-          const projectedStreak = streak + 1 + bankedStreak;
-          const projStreakMult = Math.min(1 + Math.floor(projectedStreak / 3), 5);
-
-          let formula;
-          if (selPile) {
-            // Show the actual numbers for the selected pile
-            formula = `H/L: 10×${depth} = ${10 * depth} · SAME: 50 · streak ×${projStreakMult}`;
-          } else {
-            formula = `H/L: 10 × stack depth · SAME: 50 · next streak ×${projStreakMult}`;
-          }
-
-          const stats = `Streak ×${streak}${bankedStreak > 0 ? ` (+${bankedStreak} banked)` : ""}${hasJoker("luckyguess") ? ` · HOT ${(hotStreak * 100).toFixed(1)}%` : ""} · ${deck.length} in deck · ${aliveCount} alive`;
-
-          return (
-            <div
-              style={{
-                background: "#000",
-                color: "#00ff00",
-                border: "2px solid #000",
-                boxShadow: "3px 3px 0 #000",
-                padding: "6px 10px",
-                marginBottom: 8,
-                fontSize: 14,
-                flexShrink: 0,
-                fontFamily: "'VT323', monospace",
-                lineHeight: 1.3,
-              }}
-            >
-              {message && (
-                <div style={{ color: "#ffff00", marginBottom: 2 }}>
-                  <span style={{ marginRight: 4 }}>&gt;</span>
-                  {message}
-                </div>
-              )}
-              <div>
-                <span style={{ marginRight: 4, opacity: 0.6 }}>$</span>
-                <span>{formula}</span>
-              </div>
-              <div style={{ opacity: 0.7 }}>
-                <span style={{ marginRight: 4, opacity: 0.6 }}>$</span>
-                <span>{stats}</span>
-                <span style={{ animation: "blink 1s steps(2) infinite" }}>_</span>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* Guess controls with score previews */}
         {phase === "playing" && (() => {
