@@ -447,8 +447,16 @@ export default function BeatTheRobot() {
   const [piles, setPiles] = useState([]);
   const [deadPiles, setDeadPiles] = useState([]);
   const [selectedPile, setSelectedPile] = useState(null);
-  const [jokerBlink, setJokerBlink] = useState(null); // "sticky" | null
+  const [jokerBlink, setJokerBlink] = useState(null); // "sticky" | "hardwayout" | null
   const blinkTimeoutRef = useRef(null);
+  const triggerJokerBlink = (jokerId) => {
+    if (blinkTimeoutRef.current) clearTimeout(blinkTimeoutRef.current);
+    setJokerBlink(jokerId);
+    blinkTimeoutRef.current = setTimeout(() => {
+      setJokerBlink(null);
+      blinkTimeoutRef.current = null;
+    }, 600);
+  };
   const [message, setMessage] = useState("");
   const [roundScore, setRoundScore] = useState(0);
   const [streak, setStreak] = useState(0);
@@ -660,12 +668,7 @@ export default function BeatTheRobot() {
     if (phase !== "playing") return;
     // Sticky: pile selection is locked
     if (hasJoker("sticky") && selectedPile !== null && idx !== selectedPile) {
-      if (blinkTimeoutRef.current) clearTimeout(blinkTimeoutRef.current);
-      setJokerBlink("sticky");
-      blinkTimeoutRef.current = setTimeout(() => {
-        setJokerBlink(null);
-        blinkTimeoutRef.current = null;
-      }, 600);
+      triggerJokerBlink("sticky");
       return;
     }
 
@@ -703,7 +706,10 @@ export default function BeatTheRobot() {
       const probH = guessProbability(top, "higher", deck.slice(1));
       const probL = guessProbability(top, "lower", deck.slice(1));
       const restricted = probH >= probL ? "higher" : "lower";
-      if (direction === restricted) return;
+      if (direction === restricted) {
+        triggerJokerBlink("hardwayout");
+        return;
+      }
     }
     const pile = piles[idx];
     const top = pile[pile.length - 1];
@@ -1070,7 +1076,10 @@ export default function BeatTheRobot() {
               const probH = guessProbability(top, "higher", deck);
               const probL = guessProbability(top, "lower", deck);
               const restricted = probH >= probL ? "higher" : "lower";
-              if (restricted === "higher") break;
+              if (restricted === "higher") {
+                triggerJokerBlink("hardwayout");
+                break;
+              }
             }
             guess("higher");
             e.preventDefault();
@@ -1084,7 +1093,10 @@ export default function BeatTheRobot() {
               const probH = guessProbability(top, "higher", deck);
               const probL = guessProbability(top, "lower", deck);
               const restricted = probH >= probL ? "higher" : "lower";
-              if (restricted === "lower") break;
+              if (restricted === "lower") {
+                triggerJokerBlink("hardwayout");
+                break;
+              }
             }
             guess("lower");
             e.preventDefault();
@@ -1113,12 +1125,7 @@ export default function BeatTheRobot() {
     if (e.touches.length !== 1) return;
     if (deadPiles[i] || phase !== "playing") return;
     if (hasJoker("sticky") && selectedPile !== null && i !== selectedPile) {
-      if (blinkTimeoutRef.current) clearTimeout(blinkTimeoutRef.current);
-      setJokerBlink("sticky");
-      blinkTimeoutRef.current = setTimeout(() => {
-        setJokerBlink(null);
-        blinkTimeoutRef.current = null;
-      }, 600);
+      triggerJokerBlink("sticky");
       return;
     }
     swipeStart.current = {
@@ -1177,6 +1184,7 @@ export default function BeatTheRobot() {
         const probL = guessProbability(top, "lower", deck);
         const restricted = probH >= probL ? "higher" : "lower";
         if (direction === restricted) {
+          triggerJokerBlink("hardwayout");
           swipeStart.current = null;
           setSwipeOffset(null);
           setSwipeDir(null);
@@ -1738,8 +1746,14 @@ export default function BeatTheRobot() {
             }[variant];
             return (
               <button
-                onClick={() => guess(dir)}
-                disabled={disabled}
+                onClick={() => {
+                  if (hardWayDisabled) {
+                    triggerJokerBlink("hardwayout");
+                  } else {
+                    guess(dir);
+                  }
+                }}
+                disabled={selectedPile === null}
                 className="active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-transform"
                 style={{
                   background: disabled ? "#888" : colors.bg,
