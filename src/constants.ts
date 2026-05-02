@@ -19,35 +19,40 @@ export const RANK_VALUE: Record<string, number> = {
   K: 13,
 };
 
-export const EVEN_RANKS = new Set(["2", "4", "6", "8", "10", "Q"]);
+export const EVEN_RANKS = new Set(["2", "4", "6", "8", "10"]);
 
-export const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 2000, 3500, 6000, 10000, 17000, 28000];
+export const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 1800, 2800, 4200, 6000, 8500, 12000];
 
 export const ALL_JOKERS: Joker[] = [
-  { id: "777", name: "777", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00" },
-  { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa" },
-  { id: "even", name: "EVEN STEVEN", desc: "Guessing on an even rank (2/4/6/8/10/Q) scores ×2.", color: "#88ddff" },
-  { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800" },
-  { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
-  { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
-  { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355" },
-  { id: "wildcard", name: "WILDCARD", desc: "5 cards in the deck are wild — any guess is correct.", color: "#ffd700" },
-  { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600" },
-  { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff" },
-  { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom card of the deck.", color: "#ddaa00" },
+  { id: "777", name: "777", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00", rarity: "common" },
+  { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa", rarity: "common" },
+  { id: "even", name: "EVEN STEVEN", desc: "Guessing on an even rank (2/4/6/8/10) scores ×2.", color: "#88ddff", rarity: "common" },
+  { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800", rarity: "common" },
+  { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <40% chance score ×2.", color: "#cc66ff", rarity: "common" },
+  { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥60% chance score ×1.5.", color: "#66ff66", rarity: "common" },
+  { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355", rarity: "uncommon" },
+  { id: "wildcard", name: "WILDCARD", desc: "2 cards in the deck are wild — any guess is correct.", color: "#ffd700", rarity: "uncommon" },
+  { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600", rarity: "uncommon" },
+  { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff", rarity: "common" },
+  { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom 5 cards of the deck.", color: "#ddaa00", rarity: "common" },
 ];
 
-export const CURSED_JOKERS: Joker[] = [
-  { id: "sticky", name: "STICKY BUTTONS", desc: "Piles must be guessed left to right — you cannot choose.", color: "#cc2222", cursed: true },
-  { id: "gambler", name: "THE GAMBLER", desc: "All scores ×2. Wrong guesses kill 2 piles.", color: "#cc2222", cursed: true },
+export const CURSED_DECK_MOD: Joker[] = [
   { id: "royallyscrewed", name: "ROYALLY SCREWED", desc: "The deck has twice as many face cards (J/Q/K).", color: "#cc2222", cursed: true },
-  { id: "hardwayout", name: "HARD WAY OUT", desc: "Every 5th guess, you cannot pick the highest-probability option.", color: "#cc2222", cursed: true },
-  { id: "reshuffle", name: "AUTO-RESHUFFLE", desc: "Piles auto-shuffle when 13+ cards.", color: "#cc2222", cursed: true },
   { id: "smaller", name: "A LITTLE SMALLER", desc: "No 6s. Each of 2,3,4,5 appears 5 times instead of 4.", color: "#cc2222", cursed: true },
   { id: "bigger", name: "A LITTLE BIGGER", desc: "No 8s. Each of 9,10,J,Q appears 5 times instead of 4.", color: "#cc2222", cursed: true },
   { id: "dyslexic", name: "DYSLEXIC", desc: "All 2s become 5s.", color: "#cc2222", cursed: true },
   { id: "sevennine", name: "SEVEN ATE NINE", desc: "All 9s become 7s.", color: "#cc2222", cursed: true },
 ];
+
+export const CURSED_GAMEPLAY: Joker[] = [
+  { id: "sticky", name: "STICKY BUTTONS", desc: "Piles must be guessed left to right — you cannot choose.", color: "#cc2222", cursed: true },
+  { id: "gambler", name: "THE GAMBLER", desc: "All scores ×2. Wrong guesses kill 2 piles.", color: "#cc2222", cursed: true },
+  { id: "hardwayout", name: "HARD WAY OUT", desc: "Every 5th guess, you cannot pick the highest-probability option.", color: "#cc2222", cursed: true },
+  { id: "reshuffle", name: "AUTO-RESHUFFLE", desc: "Piles auto-shuffle when 10+ cards.", color: "#cc2222", cursed: true },
+];
+
+export const CURSED_JOKERS = [...CURSED_DECK_MOD, ...CURSED_GAMEPLAY];
 
 export function buildDeck(): Card[] {
   const deck: Card[] = [];
@@ -102,7 +107,7 @@ export function applyJokerEffects(deck: Card[], jokerIds: string[]): Card[] {
 
   if (jokerIds.includes("wildcard")) {
     const indices = new Set<number>();
-    while (indices.size < 5) indices.add(Math.floor(Math.random() * result.length));
+    while (indices.size < 2) indices.add(Math.floor(Math.random() * result.length));
     result = result.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
   }
 
@@ -112,13 +117,29 @@ export function applyJokerEffects(deck: Card[], jokerIds: string[]): Card[] {
 export function pickJokerOptions(owned: Joker[], round: number): Joker[] {
   if (round % 3 === 2) {
     const alreadyOwned = owned.filter((j) => j.cursed).map((j) => j.id);
-    const available = CURSED_JOKERS.filter((j) => !alreadyOwned.includes(j.id));
-    const pool = available.length >= 2 ? available : CURSED_JOKERS;
+    const cursePool = Math.floor((round - 2) / 3) % 2 === 0 ? CURSED_DECK_MOD : CURSED_GAMEPLAY;
+    const available = cursePool.filter((j) => !alreadyOwned.includes(j.id));
+    const pool = available.length >= 2 ? available : cursePool;
     const shuffled = [...pool].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, 2);
   }
+
   const available = ALL_JOKERS.filter((j) => !owned.find((o) => o.id === j.id));
-  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  const offerUncommon = round > 1 && round % 3 === 1;
+
+  if (offerUncommon) {
+    const uncommon = available.filter((j) => j.rarity === "uncommon");
+    const common = available.filter((j) => j.rarity === "common");
+    const shuffledUncommon = [...uncommon].sort(() => Math.random() - 0.5);
+    const shuffledCommon = [...common].sort(() => Math.random() - 0.5);
+    return [
+      ...shuffledUncommon.slice(0, 1),
+      ...shuffledCommon.slice(0, 2),
+    ];
+  }
+
+  const commonOnly = available.filter((j) => j.rarity === "common");
+  const shuffled = [...commonOnly].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, Math.min(3, shuffled.length));
 }
 
@@ -176,11 +197,11 @@ export function previewScore(
     unconditionalMult *= 5;
     unconditional.push("Last Stand ×5");
   }
-  if (has("underdog") && prob < 0.25 && prob > 0) {
+  if (has("underdog") && prob < 0.4 && prob > 0) {
     unconditionalMult *= 2;
     unconditional.push("Underdog ×2");
   }
-  if (has("surething") && prob >= 0.75) {
+  if (has("surething") && prob >= 0.6) {
     unconditionalMult *= 1.5;
     unconditional.push("Sure Thing ×1.5");
   }

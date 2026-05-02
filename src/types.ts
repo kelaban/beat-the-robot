@@ -35,6 +35,7 @@ export interface Joker {
   desc: string;
   color: string;
   cursed?: boolean;
+  rarity?: "common" | "uncommon";
 }
 
 export interface Floater {

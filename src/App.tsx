@@ -328,7 +328,7 @@ function JokerCard({ joker, onSelect, selectable, small, depleted, blinking, act
       disabled={!selectable}
       style={{
         background: "#1a1a2e",
-        border: `2px solid ${active ? "#ffd700" : joker.color}`,
+        border: `2px solid ${active ? "#ffd700" : "#000"}`,
         boxShadow: `3px 3px 0 #000`,
         padding: small ? "4px 6px" : "8px 10px",
         cursor: selectable ? "pointer" : "default",
@@ -570,7 +570,7 @@ export default function BeatTheRobot() {
 
   const aliveCount = deadPiles.filter((d) => !d).length;
   const rankCounts = useMemo(() => countByRank(deck), [deck]);
-  const bottomCard = deck.length > 0 ? deck[deck.length - 1] : null;
+  const bottomCards = deck.length >= 5 ? deck.slice(-5) : (deck.length > 0 ? deck : []);
 
   const handlePileClick = (idx: number) => {
     if (phase !== "playing") return;
@@ -646,7 +646,7 @@ export default function BeatTheRobot() {
     setPiles(newPiles);
     setDeck(remainingDeck);
 
-    if (hasJoker("reshuffle") && newPiles[idx].length >= 13) {
+    if (hasJoker("reshuffle") && newPiles[idx].length >= 10) {
       const pileCards = newPiles[idx].slice(0, -1);
       const reshuffleDeck = [...remainingDeck, ...pileCards];
       for (let i = reshuffleDeck.length - 1; i > 0; i--) {
@@ -690,12 +690,12 @@ export default function BeatTheRobot() {
         mult *= 5;
         breakdown.push("LAST×5");
       }
-      if (hasJoker("underdog") && probability < 0.25 && probability > 0) {
+      if (hasJoker("underdog") && probability < 0.4 && probability > 0) {
         mult *= 2;
         breakdown.push("UD×2");
         triggerJokerBlink("underdog");
       }
-      if (hasJoker("surething") && probability >= 0.75) {
+      if (hasJoker("surething") && probability >= 0.6) {
         mult *= 1.5;
         breakdown.push("ST×1.5");
       }
@@ -1114,10 +1114,10 @@ export default function BeatTheRobot() {
         @keyframes flashOutline { 0%,100% { outline-color: #ffff00; } 50% { outline-color: #ff8800; } }
         @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
         @keyframes floatUp {
-          0% { transform: translateY(20%) scale(0.6); opacity: 0; }
-          15% { transform: translateY(0) scale(1.15); opacity: 1; }
-          35% { transform: translateY(-15%) scale(1); opacity: 1; }
-          100% { transform: translateY(-180%) scale(0.85); opacity: 0; }
+          0% { transform: translateY(30%) scale(0.6); opacity: 0; }
+          25% { transform: translateY(0) scale(1.3); opacity: 1; }
+          40% { transform: translateY(-20%) scale(1.1); opacity: 1; }
+          100% { transform: translateY(-280%) scale(1); opacity: 0; }
         }
         @keyframes firePop {
           0% { transform: scale(0) rotate(-20deg); opacity: 0; }
@@ -1147,7 +1147,7 @@ export default function BeatTheRobot() {
         }
         @keyframes scoreCount {
           0%, 100% { transform: scale(1); color: inherit; }
-          50% { transform: scale(1.15); color: #008000; }
+          50% { transform: scale(1.4); color: #008000; }
         }
         @keyframes modalPop {
           0% { transform: scale(0.7); opacity: 0; }
@@ -1235,7 +1235,7 @@ export default function BeatTheRobot() {
               style={{
                 fontWeight: 700,
                 color: roundScore >= target ? "#008000" : "#000",
-                animation: scorePulse > 0 ? "scoreCount 0.55s ease" : "none",
+                animation: scorePulse > 0 ? "scoreCount 0.8s ease" : "none",
                 transformOrigin: "left center",
               }}
             >
@@ -1292,34 +1292,37 @@ export default function BeatTheRobot() {
           </div>
         )}
 
-        {hasJoker("deadreck") && bottomCard && (
+        {hasJoker("deadreck") && bottomCards.length > 0 && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 4,
               background: "#1a1a2e",
               border: "2px solid #ddaa00",
               boxShadow: "3px 3px 0 #000",
-              padding: "4px 8px",
+              padding: "4px 6px",
               marginBottom: 8,
               flexShrink: 0,
+              flexWrap: "wrap",
             }}
           >
             <div style={{ fontSize: 9, color: "#ddaa00", fontFamily: "'Press Start 2P', monospace" }}>BOTTOM:</div>
-            <div
-              style={{
-                background: "#fff",
-                color: bottomCard.suit === "♥" || bottomCard.suit === "♦" ? "#c00000" : "#000",
-                padding: "2px 6px",
-                fontWeight: 700,
-                border: "1px solid #000",
-                fontSize: 16,
-              }}
-            >
-              {bottomCard.rank}
-              {bottomCard.suit}
-            </div>
+            {bottomCards.map((c, i) => (
+              <div
+                key={i}
+                style={{
+                  background: "#fff",
+                  color: c.suit === "♥" || c.suit === "♦" ? "#c00000" : "#000",
+                  padding: "1px 4px",
+                  fontWeight: 700,
+                  border: "1px solid #000",
+                  fontSize: 13,
+                }}
+              >
+                {c.rank}{c.suit}
+              </div>
+            ))}
           </div>
         )}
 
@@ -1336,7 +1339,8 @@ export default function BeatTheRobot() {
               >
                 {ownedJokers.filter(j => !j.cursed).map((j) => {
                   const depleted = j.id === "phoenix" && phoenixUsed;
-                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && (correctCount % 5 === 0 && correctCount > 0 || compoundCounter === 0));
+                  const selectedTop = selectedPile !== null ? piles[selectedPile]?.[piles[selectedPile].length - 1] : null;
+                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && compoundCounter === 0) || (j.id === "777" && selectedTop?.rank === "7");
                   const counter = j.id === "compound" ? compoundCounter : undefined;
                   return (
                     <JokerCard
@@ -1364,7 +1368,8 @@ export default function BeatTheRobot() {
               >
                 {ownedJokers.filter(j => j.cursed).map((j) => {
                   const depleted = j.id === "phoenix" && phoenixUsed;
-                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && (correctCount % 5 === 0 && correctCount > 0 || compoundCounter === 0)) || (j.id === "hardwayout" && (hardWayCounter === 0 || (guessCount + 1) % 5 === 0));
+                  const selectedTop = selectedPile !== null ? piles[selectedPile]?.[piles[selectedPile].length - 1] : null;
+                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && compoundCounter === 0) || (j.id === "777" && selectedTop?.rank === "7") || (j.id === "hardwayout" && (hardWayCounter === 0 || (guessCount + 1) % 5 === 0));
                   const counter = j.id === "hardwayout" ? hardWayCounter : undefined;
                   return (
                     <JokerCard
@@ -1542,7 +1547,7 @@ export default function BeatTheRobot() {
                       justifyContent: "center",
                       pointerEvents: "none",
                       zIndex: 30,
-                      animation: f.isEmoji ? "firePop 1.2s ease-out forwards" : "floatUp 1.6s ease-out forwards",
+                      animation: f.isEmoji ? "firePop 1.2s ease-out forwards" : "floatUp 2.8s ease-out forwards",
                       fontFamily: f.isEmoji ? "sans-serif" : "'Press Start 2P', monospace",
                       fontSize: f.isEmoji ? "clamp(32px, 8vmin, 48px)" : "clamp(11px, 3vmin, 18px)",
                       color: f.color,

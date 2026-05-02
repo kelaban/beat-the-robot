@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDeck, applyJokerEffects } from '../constants'
+import { buildDeck, applyJokerEffects, pickJokerOptions, ROUND_TARGETS, CURSED_DECK_MOD, CURSED_GAMEPLAY } from '../constants'
 
 describe('Joker deck transformations', () => {
   describe('dyslexic joker (2s become 5s)', () => {
@@ -101,20 +101,153 @@ describe('Joker deck transformations', () => {
   describe('no jokers', () => {
     it('should return original deck unchanged', () => {
       const deck = buildDeck()
-      
+
       const transformed = applyJokerEffects(deck, [])
-      
+
       expect(transformed.length).toBe(52)
-      
+
       const rankCounts: Record<string, number> = {}
       for (const card of deck) {
         rankCounts[card.rank] = (rankCounts[card.rank] || 0) + 1
       }
-      
+
       for (const rank of Object.keys(rankCounts)) {
         const transformedCount = transformed.filter(c => c.rank === rank).length
         expect(transformedCount).toBe(rankCounts[rank])
       }
+    })
+  })
+
+  describe('wildcard joker', () => {
+    it('should add exactly 2 wildcards to the deck', () => {
+      const deck = buildDeck()
+
+      const transformed = applyJokerEffects(deck, ['wildcard'])
+
+      const wildcards = transformed.filter(c => c.wild === true)
+      expect(wildcards.length).toBe(2)
+    })
+
+    it('should keep deck at 52 cards', () => {
+      const deck = buildDeck()
+
+      const transformed = applyJokerEffects(deck, ['wildcard'])
+
+      expect(transformed.length).toBe(52)
+    })
+  })
+
+  describe('round targets', () => {
+    it('should have 12 round targets', () => {
+      expect(ROUND_TARGETS.length).toBe(12)
+    })
+
+    it('should have flattened late-game progression', () => {
+      expect(ROUND_TARGETS[9]).toBe(6000)
+      expect(ROUND_TARGETS[10]).toBe(8500)
+      expect(ROUND_TARGETS[11]).toBe(12000)
+    })
+
+    it('should start at 50 and increase monotonically', () => {
+      expect(ROUND_TARGETS[0]).toBe(50)
+      for (let i = 1; i < ROUND_TARGETS.length; i++) {
+        expect(ROUND_TARGETS[i]).toBeGreaterThan(ROUND_TARGETS[i - 1])
+      }
+    })
+  })
+
+  describe('pickJokerOptions', () => {
+    const owned: ReturnType<typeof pickJokerOptions> = []
+
+    describe('uncommon joker offering', () => {
+      it('should NOT offer uncommon on round 1 (first round is common-only)', () => {
+        const options = pickJokerOptions(owned, 1)
+        const hasUncommon = options.some(j => j.rarity === 'uncommon')
+        expect(hasUncommon).toBe(false)
+      })
+
+      it('should NOT offer uncommon on round 3', () => {
+        const options = pickJokerOptions(owned, 3)
+        const hasUncommon = options.some(j => j.rarity === 'uncommon')
+        expect(hasUncommon).toBe(false)
+      })
+
+      it('should offer uncommon on round 4', () => {
+        const options = pickJokerOptions(owned, 4)
+        const hasUncommon = options.some(j => j.rarity === 'uncommon')
+        expect(hasUncommon).toBe(true)
+      })
+
+      it('should NOT offer uncommon on round 6', () => {
+        const options = pickJokerOptions(owned, 6)
+        const hasUncommon = options.some(j => j.rarity === 'uncommon')
+        expect(hasUncommon).toBe(false)
+      })
+
+      it('should offer uncommon on round 7', () => {
+        const options = pickJokerOptions(owned, 7)
+        const hasUncommon = options.some(j => j.rarity === 'uncommon')
+        expect(hasUncommon).toBe(true)
+      })
+
+      it('should NOT offer uncommon on round 9', () => {
+        const options = pickJokerOptions(owned, 9)
+        const hasUncommon = options.some(j => j.rarity === 'uncommon')
+        expect(hasUncommon).toBe(false)
+      })
+    })
+
+    describe('cursed joker rotation', () => {
+      it('should offer deck-modifying curses on round 2', () => {
+        const options = pickJokerOptions(owned, 2)
+        const deckModIds = CURSED_DECK_MOD.map(j => j.id)
+        options.forEach(opt => {
+          expect(deckModIds).toContain(opt.id)
+        })
+      })
+
+      it('should offer gameplay-affecting curses on round 5', () => {
+        const options = pickJokerOptions(owned, 5)
+        const gameplayIds = CURSED_GAMEPLAY.map(j => j.id)
+        options.forEach(opt => {
+          expect(gameplayIds).toContain(opt.id)
+        })
+      })
+
+      it('should offer deck-modifying curses on round 8', () => {
+        const options = pickJokerOptions(owned, 8)
+        const deckModIds = CURSED_DECK_MOD.map(j => j.id)
+        options.forEach(opt => {
+          expect(deckModIds).toContain(opt.id)
+        })
+      })
+
+      it('should offer gameplay-affecting curses on round 11', () => {
+        const options = pickJokerOptions(owned, 11)
+        const gameplayIds = CURSED_GAMEPLAY.map(j => j.id)
+        options.forEach(opt => {
+          expect(gameplayIds).toContain(opt.id)
+        })
+      })
+    })
+
+    describe('joker pool', () => {
+      it('should return 3 options on non-cursed rounds', () => {
+        const options = pickJokerOptions(owned, 1)
+        expect(options.length).toBe(3)
+      })
+
+      it('should return 2 options on cursed rounds', () => {
+        const options = pickJokerOptions(owned, 2)
+        expect(options.length).toBe(2)
+      })
+
+      it('should not offer jokers already owned', () => {
+        const ownedWithWildcard = [{ id: 'wildcard', name: 'WILDCARD', desc: '...', color: '#fff', rarity: 'uncommon' }] as ReturnType<typeof pickJokerOptions>
+        const options = pickJokerOptions(ownedWithWildcard, 1)
+        const hasWildcard = options.some(j => j.id === 'wildcard')
+        expect(hasWildcard).toBe(false)
+      })
     })
   })
 })
