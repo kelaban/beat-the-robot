@@ -27,13 +27,12 @@ const ALL_JOKERS = [
   { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800" },
   { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <25% chance score ×2.", color: "#cc66ff" },
   { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥75% chance score ×1.5.", color: "#66ff66" },
-  { id: "luckyguess", name: "LUCKY GUESS", desc: "When hot streak reaches 10% cumulative prob, revive 1 dead pile.", color: "#ff3355" },
+  { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355" },
   { id: "wildcard", name: "WILDCARD", desc: "5 cards in the deck are wild — any guess is correct.", color: "#ffd700" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600" },
   { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff" },
   { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom card of the deck.", color: "#ddaa00" },
-  { id: "combo", name: "COMBO BREAKER", desc: "Wrong guesses bank +1 streak for next hit.", color: "#ff99cc" },
-];
+  ];
 
 const CURSED_JOKERS = [
   { id: "sticky", name: "STICKY BUTTONS", desc: "Piles must be guessed left to right — you cannot choose.", color: "#cc2222", cursed: true },
@@ -82,7 +81,7 @@ const guessProbability = (top, direction, deckRemaining) => {
 
 // Compute base score before card-conditional jokers — this is the guaranteed
 // floor if the guess is correct.
-const previewScore = (pile, direction, deck, ownedJokers, streak, bankedStreak, aliveCount, correctCount) => {
+const previewScore = (pile, direction, deck, ownedJokers, streak, aliveCount, correctCount) => {
   const has = (id) => ownedJokers.some((j) => j.id === id);
   const top = pile[pile.length - 1];
   const newDepth = pile.length + 1;
@@ -125,7 +124,7 @@ const previewScore = (pile, direction, deck, ownedJokers, streak, bankedStreak, 
   const conditional = [];
 
   // Streak
-  const projectedStreak = streak + 1 + bankedStreak;
+  const projectedStreak = streak + 1;
   const streakMult = Math.min(1 + Math.floor(projectedStreak / 3), 5);
 
   const guaranteedScore = Math.floor(base * unconditionalMult * streakMult);
@@ -476,7 +475,8 @@ export default function BeatTheRobot() {
   const [streak, setStreak] = useState(0);
   const [flashPile, setFlashPile] = useState(null);
   const [flashKind, setFlashKind] = useState(null);
-  const [floaters, setFloaters] = useState([]); // {id, pileIdx, text, color}
+  const [floaters, setFloaters] = useState([]); // {id, pileIdx, text, color, isEmoji}
+  const [luckyFirePile, setLuckyFirePile] = useState(null); // pile idx for lucky guess fire animation
   const [streakPulse, setStreakPulse] = useState(0); // increments to retrigger pulse animation
   const [scorePulse, setScorePulse] = useState(0);
   const [newCardPile, setNewCardPile] = useState(null); // pile idx for slide-in animation
@@ -485,7 +485,6 @@ export default function BeatTheRobot() {
   const [phoenixUsed, setPhoenixUsed] = useState(false);
   const [phoenixCounter, setPhoenixCounter] = useState(0); // counts correct guesses since first death
   const [phoenixTarget, setPhoenixTarget] = useState(null); // pile idx to revive
-  const [bankedStreak, setBankedStreak] = useState(0); // combo breaker
   const [compoundCounter, setCompoundCounter] = useState(4); // counts down from 4 for compound int
   const [hardWayCounter, setHardWayCounter] = useState(4); // counts down from 4 for hard way out
   const [correctCount, setCorrectCount] = useState(0); // for compound interest
@@ -607,7 +606,6 @@ export default function BeatTheRobot() {
     setSelectedPile(null);
     setRoundScore(0);
     setStreak(0);
-    setBankedStreak(0);
     setCorrectCount(0);
     setHotStreak(1);
     setPhoenixUsed(false);
@@ -823,11 +821,10 @@ export default function BeatTheRobot() {
       }
       setCorrectCount(newCorrectCount);
 
-      // Streak (with banked from combo breaker)
-      const newStreak = streak + 1 + bankedStreak;
+      // Streak
+      const newStreak = streak + 1;
       const streakMult = Math.min(1 + Math.floor(newStreak / 3), 5);
       setStreak(newStreak);
-      setBankedStreak(0);
       setStreakPulse((p) => p + 1);
 
       // Lucky Guess: update hot streak and trigger if < 10%
@@ -839,6 +836,13 @@ export default function BeatTheRobot() {
           const newDead = deadPiles.map((d, i) => (i === deadIdx ? false : d));
           setDeadPiles(newDead);
           setMessage(`*** LUCKY GUESS! Pile ${deadIdx + 1} revived. ***`);
+          setLuckyFirePile(deadIdx);
+          setTimeout(() => setLuckyFirePile(null), 1200);
+          const fireId = Date.now() + Math.random();
+          setFloaters((f) => [...f, { id: fireId, pileIdx: deadIdx, text: "🔥", color: "#ff6600", isEmoji: true }]);
+          setTimeout(() => {
+            setFloaters((f) => f.filter((x) => x.id !== fireId));
+          }, 1200);
           if (phoenixTarget === deadIdx) setPhoenixTarget(null);
         }
       }
@@ -929,10 +933,6 @@ export default function BeatTheRobot() {
       // Wrong guess
       setStreak(0);
       setHotStreak(1);
-      // Combo Breaker banks
-      if (hasJoker("combo")) {
-        setBankedStreak((b) => b + 1);
-      }
 
       // Determine kills (Gambler kills 2)
       const killCount = hasJoker("gambler") ? 2 : 1;
@@ -999,7 +999,6 @@ export default function BeatTheRobot() {
 
       let msg = `MISS! Pile ${idx + 1} dead.`;
       if (killCount > 1) msg += ` Gambler killed another!`;
-      if (hasJoker("combo")) msg += ` Streak banked.`;
       msg += ` ${remainingAlive} alive.`;
       setMessage(msg);
       // Pile is dead — advance to next alive pile so desktop players don't lose selection.
@@ -1257,6 +1256,13 @@ export default function BeatTheRobot() {
           35% { transform: translateY(-15%) scale(1); opacity: 1; }
           100% { transform: translateY(-180%) scale(0.85); opacity: 0; }
         }
+        @keyframes firePop {
+          0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+          20% { transform: scale(1.4) rotate(10deg); opacity: 1; }
+          40% { transform: scale(1) rotate(-5deg); }
+          60% { transform: scale(1.1) rotate(3deg); }
+          100% { transform: scale(0.5) translateY(-80%); opacity: 0; }
+        }
         @keyframes cardSlideIn {
           0% { transform: translateY(-150%) rotate(-12deg); opacity: 0; }
           70% { transform: translateY(8%) rotate(2deg); opacity: 1; }
@@ -1392,7 +1398,6 @@ export default function BeatTheRobot() {
               }}
             >
               ×{streak}
-              {bankedStreak > 0 && <span style={{ color: "#cc66ff" }}> +{bankedStreak}</span>}
             </div>
           </div>
           <div>
@@ -1683,11 +1688,11 @@ export default function BeatTheRobot() {
                       justifyContent: "center",
                       pointerEvents: "none",
                       zIndex: 30,
-                      animation: "floatUp 1.6s ease-out forwards",
-                      fontFamily: "'Press Start 2P', monospace",
-                      fontSize: "clamp(11px, 3vmin, 18px)",
+                      animation: f.isEmoji ? "firePop 1.2s ease-out forwards" : "floatUp 1.6s ease-out forwards",
+                      fontFamily: f.isEmoji ? "sans-serif" : "'Press Start 2P', monospace",
+                      fontSize: f.isEmoji ? "clamp(32px, 8vmin, 48px)" : "clamp(11px, 3vmin, 18px)",
                       color: f.color,
-                      textShadow: "2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
+                      textShadow: f.isEmoji ? "0 0 20px rgba(255,102,0,0.8), 0 0 40px rgba(255,102,0,0.4)" : "2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000",
                       whiteSpace: "pre",
                       textAlign: "center",
                       lineHeight: 1.3,
@@ -1706,9 +1711,9 @@ export default function BeatTheRobot() {
         {phase === "playing" && (() => {
           const previews = selectedPile !== null
             ? {
-                lower: previewScore(piles[selectedPile], "lower", deck, ownedJokers, streak, bankedStreak, aliveCount, correctCount),
-                same: previewScore(piles[selectedPile], "same", deck, ownedJokers, streak, bankedStreak, aliveCount, correctCount),
-                higher: previewScore(piles[selectedPile], "higher", deck, ownedJokers, streak, bankedStreak, aliveCount, correctCount),
+                lower: previewScore(piles[selectedPile], "lower", deck, ownedJokers, streak, aliveCount, correctCount),
+                same: previewScore(piles[selectedPile], "same", deck, ownedJokers, streak, aliveCount, correctCount),
+                higher: previewScore(piles[selectedPile], "higher", deck, ownedJokers, streak, aliveCount, correctCount),
               }
             : null;
 
