@@ -39,6 +39,8 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+        env:
+          VITE_SENTRY_DSN: "https://d8c5a68134416097e831cd6266fedab6@o4511327566954496.ingest.us.sentry.io/4511327586549760"
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Upload artifact
