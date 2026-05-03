@@ -509,14 +509,15 @@ export default function BeatTheRobot() {
 
   const target = ROUND_TARGETS[round - 1];
 
-  const startRound = (roundNum: number) => {
+  const startRound = (roundNum: number, jokers: Joker[] = ownedJokers) => {
     let deck: Card[] = buildDeck();
+    const hasJ = (id: string) => jokers.some((j) => j.id === id);
     const jokerIds = [
-      hasJoker("smaller") && "smaller",
-      hasJoker("bigger") && "bigger",
-      hasJoker("dyslexic") && "dyslexic",
-      hasJoker("sevennine") && "sevennine",
-      hasJoker("wildcard") && "wildcard",
+      hasJ("smaller") && "smaller",
+      hasJ("bigger") && "bigger",
+      hasJ("dyslexic") && "dyslexic",
+      hasJ("sevennine") && "sevennine",
+      hasJ("wildcard") && "wildcard",
     ].filter(Boolean) as string[];
     deck = applyJokerEffects(deck, jokerIds);
 
@@ -549,7 +550,7 @@ export default function BeatTheRobot() {
     setRound(1);
     setRunScore(0);
     setOwnedJokers([]);
-    startRound(1);
+    startRound(1, []);
   };
 
   useEffect(() => {
@@ -906,7 +907,7 @@ export default function BeatTheRobot() {
     setOwnedJokers(newJokers);
     const nextRound = round + 1;
     setRound(nextRound);
-    startRound(nextRound);
+    startRound(nextRound, newJokers);
   };
 
   const closeRules = () => {
