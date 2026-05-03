@@ -122,7 +122,7 @@ function Card({ card, faceDown, dim, peelCard }: CardProps) {
                 fontFamily: "'VT323', monospace",
                 fontWeight: 700,
                 color: isRedPeel ? "#c00000" : "#000",
-                fontSize: "clamp(14px, 14cqw, 28px)",
+                fontSize: "clamp(18px, 18cqw, 36px)",
                 textAlign: "right",
                 zIndex: 3,
                 transform: "rotate(180deg)",
@@ -230,7 +230,7 @@ function Card({ card, faceDown, dim, peelCard }: CardProps) {
         </>
       ) : (
         <>
-          <div style={{ position: "absolute", top: "3%", left: "6%", lineHeight: 1, fontSize: "clamp(14px, 14cqw, 28px)", fontWeight: 700 }}>
+          <div style={{ position: "absolute", top: "3%", left: "6%", lineHeight: 1, fontSize: "clamp(18px, 18cqw, 36px)", fontWeight: 700 }}>
             <div>{card.rank}</div>
             <div style={{ fontSize: "0.8em" }}>{card.suit}</div>
           </div>
@@ -252,7 +252,7 @@ function Card({ card, faceDown, dim, peelCard }: CardProps) {
               bottom: "3%",
               right: "6%",
               lineHeight: 1,
-              fontSize: "clamp(14px, 14cqw, 28px)",
+              fontSize: "clamp(18px, 18cqw, 36px)",
               fontWeight: 700,
               transform: "rotate(180deg)",
             }}
@@ -1231,7 +1231,7 @@ export default function BeatTheRobot() {
           }}
         >
           <div>
-            <div style={{ fontSize: "clamp(10px, 1.6vmin, 14px)", opacity: 0.7 }}>SCORE</div>
+            <div style={{ fontSize: "clamp(14px, 2vmin, 18px)", opacity: 0.7 }}>SCORE</div>
             <div
               key={`score-${scorePulse}`}
               style={{
@@ -1245,11 +1245,11 @@ export default function BeatTheRobot() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: "clamp(10px, 1.6vmin, 14px)", opacity: 0.7 }}>GOAL</div>
+            <div style={{ fontSize: "clamp(14px, 2vmin, 18px)", opacity: 0.7 }}>GOAL</div>
             <div style={{ fontWeight: 700 }}>{target}</div>
           </div>
           <div>
-            <div style={{ fontSize: "clamp(10px, 1.6vmin, 14px)", opacity: 0.7 }}>STREAK</div>
+            <div style={{ fontSize: "clamp(14px, 2vmin, 18px)", opacity: 0.7 }}>STREAK</div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               {hasJoker("luckyguess") && (
                 <div
@@ -1294,7 +1294,7 @@ export default function BeatTheRobot() {
               </div>
             </div>
           </div>
-          <DOSButton onClick={() => setShowDeck(true)} small>
+          <DOSButton onClick={() => setShowDeck(true)}>
             DECK {deck.length}
           </DOSButton>
         </div>
@@ -2185,7 +2185,7 @@ export default function BeatTheRobot() {
                 justifyContent: "space-between",
                 alignItems: "center",
                 fontFamily: "'Press Start 2P', monospace",
-                fontSize: 10,
+                fontSize: 12,
               }}
             >
               <span>HOW TO PLAY</span>
