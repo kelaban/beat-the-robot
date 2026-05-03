@@ -38,7 +38,6 @@ export const ALL_JOKERS: Joker[] = [
 ];
 
 export const CURSED_DECK_MOD: Joker[] = [
-  { id: "royallyscrewed", name: "ROYALLY SCREWED", desc: "The deck has twice as many face cards (J/Q/K).", color: "#cc2222", cursed: true },
   { id: "smaller", name: "A LITTLE SMALLER", desc: "No 6s. Each of 2,3,4,5 appears 5 times instead of 4.", color: "#cc2222", cursed: true },
   { id: "bigger", name: "A LITTLE BIGGER", desc: "No 8s. Each of 9,10,J,Q appears 5 times instead of 4.", color: "#cc2222", cursed: true },
   { id: "dyslexic", name: "DYSLEXIC", desc: "All 2s become 5s.", color: "#cc2222", cursed: true },
@@ -66,16 +65,6 @@ export function buildDeck(): Card[] {
 
 export function applyJokerEffects(deck: Card[], jokerIds: string[]): Card[] {
   let result = [...deck];
-
-  if (jokerIds.includes("royallyscrewed")) {
-    const faceRanks = ["J", "Q", "K"];
-    const extraFaces = faceRanks.flatMap((r) => SUITS.map((s) => ({ rank: r, suit: s })));
-    extraFaces.sort(() => Math.random() - 0.5);
-    const nonFaceIdxs = result.map((_c, i) => i).filter((i) => !faceRanks.includes(result[i].rank));
-    nonFaceIdxs.sort(() => Math.random() - 0.5);
-    nonFaceIdxs.slice(0, 12).forEach((deckIdx, i) => { result[deckIdx] = extraFaces[i]; });
-    result.sort(() => Math.random() - 0.5);
-  }
 
   if (jokerIds.includes("smaller")) {
     const filtered = result.filter(c => c.rank !== "6");

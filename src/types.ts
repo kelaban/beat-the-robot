@@ -21,7 +21,6 @@ export type JokerId =
   | "deadreck"
   | "sticky"
   | "gambler"
-  | "royallyscrewed"
   | "hardwayout"
   | "reshuffle"
   | "smaller"

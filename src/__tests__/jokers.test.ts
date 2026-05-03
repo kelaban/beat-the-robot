@@ -86,15 +86,87 @@ describe('Joker deck transformations', () => {
   describe('combo: dyslexic + sevennine', () => {
     it('should apply both transformations correctly', () => {
       const deck = buildDeck()
-      
+
       const transformed = applyJokerEffects(deck, ['dyslexic', 'sevennine'])
-      
+
       // 2s become 5s, 9s become 7s
       const twos = transformed.filter(c => c.rank === '2')
       const nines = transformed.filter(c => c.rank === '9')
-      
+
       expect(twos.length).toBe(0)
       expect(nines.length).toBe(0)
+    })
+  })
+
+  describe('combo: all deck modifiers', () => {
+    it('should correctly apply dyslexic + sevennine + wildcard together', () => {
+      const deck = buildDeck()
+
+      const transformed = applyJokerEffects(deck, [
+        'dyslexic',
+        'sevennine',
+        'wildcard'
+      ])
+
+      // Deck should still have 52 cards
+      expect(transformed.length).toBe(52)
+
+      // dyslexic: all 2s become 5s
+      const twos = transformed.filter(c => c.rank === '2')
+      expect(twos.length).toBe(0)
+      const fives = transformed.filter(c => c.rank === '5')
+      expect(fives.length).toBe(8) // 4 original + 4 converted
+
+      // sevennine: all 9s become 7s
+      const nines = transformed.filter(c => c.rank === '9')
+      expect(nines.length).toBe(0)
+      const sevens = transformed.filter(c => c.rank === '7')
+      expect(sevens.length).toBe(8) // 4 original + 4 converted
+
+      // wildcard: 2 cards should be wild
+      const wildcards = transformed.filter(c => c.wild === true)
+      expect(wildcards.length).toBe(2)
+
+      // All suits should still be represented
+      const suits = new Set(transformed.map(c => c.suit))
+      expect(suits.size).toBe(4)
+    })
+
+    it('should correctly apply smaller + bigger together', () => {
+      const deck = buildDeck()
+
+      const transformed = applyJokerEffects(deck, ['smaller', 'bigger'])
+
+      // smaller: removes 6s (4), adds one of 2,3,4,5
+      // bigger: removes 8s (4), adds one of 9,10,J,Q
+      // So we should have:
+      // - No 6s
+      // - No 8s
+      // - 2s: 5 (4 original + 1 from smaller)
+      // - 3s: 5 (4 original + 1 from smaller)
+      // - 4s: 5 (4 original + 1 from smaller)
+      // - 5s: 5 (4 original + 1 from smaller)
+      // - 9s: 5 (4 original + 1 from bigger)
+      // - 10s: 5 (4 original + 1 from bigger)
+      // - Js: 5 (4 original + 1 from bigger)
+      // - Qs: 5 (4 original + 1 from bigger)
+
+      const sixes = transformed.filter(c => c.rank === '6')
+      const eights = transformed.filter(c => c.rank === '8')
+      expect(sixes.length).toBe(0)
+      expect(eights.length).toBe(0)
+
+      expect(transformed.filter(c => c.rank === '2').length).toBe(5)
+      expect(transformed.filter(c => c.rank === '3').length).toBe(5)
+      expect(transformed.filter(c => c.rank === '4').length).toBe(5)
+      expect(transformed.filter(c => c.rank === '5').length).toBe(5)
+      expect(transformed.filter(c => c.rank === '9').length).toBe(5)
+      expect(transformed.filter(c => c.rank === '10').length).toBe(5)
+      expect(transformed.filter(c => c.rank === 'J').length).toBe(5)
+      expect(transformed.filter(c => c.rank === 'Q').length).toBe(5)
+
+      // Deck size should still be 52
+      expect(transformed.length).toBe(52)
     })
   })
 

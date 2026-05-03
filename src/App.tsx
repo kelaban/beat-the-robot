@@ -275,9 +275,10 @@ interface DOSButtonProps {
   variant?: ButtonVariant;
   small?: boolean;
   full?: boolean;
+  style?: React.CSSProperties;
 }
 
-function DOSButton({ children, onClick, disabled, variant = "default", small, full }: DOSButtonProps) {
+function DOSButton({ children, onClick, disabled, variant = "default", small, full, style }: DOSButtonProps) {
   const colors: Record<ButtonVariant, { bg: string; fg: string }> = {
     default: { bg: "#c0c0c0", fg: "#000" },
     primary: { bg: "#ffff00", fg: "#000" },
@@ -303,6 +304,7 @@ function DOSButton({ children, onClick, disabled, variant = "default", small, fu
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.6 : 1,
         width: full ? "100%" : "auto",
+        ...style,
       }}
     >
       {children}
@@ -397,6 +399,7 @@ export default function BeatTheRobot() {
   const [ownedJokers, setOwnedJokers] = useState<Joker[]>([]);
   const [jokerOptions, setJokerOptions] = useState<Joker[]>([]);
   const [jokerInfo, setJokerInfo] = useState<Joker | null>(null);
+  const [showDeck, setShowDeck] = useState(false);
 
   const [initialRound] = useState(() => {
     const d = buildDeck();
@@ -503,7 +506,6 @@ export default function BeatTheRobot() {
   const startRound = (roundNum: number) => {
     let deck: Card[] = buildDeck();
     const jokerIds = [
-      hasJoker("royallyscrewed") && "royallyscrewed",
       hasJoker("smaller") && "smaller",
       hasJoker("bigger") && "bigger",
       hasJoker("dyslexic") && "dyslexic",
@@ -894,7 +896,7 @@ export default function BeatTheRobot() {
     setOwnedJokers(newJokers);
     const nextRound = round + 1;
     setRound(nextRound);
-    setTimeout(() => startRound(nextRound), 0);
+    startRound(nextRound);
   };
 
   const closeRules = () => {
@@ -1292,10 +1294,9 @@ export default function BeatTheRobot() {
               </div>
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: "clamp(10px, 1.6vmin, 14px)", opacity: 0.7 }}>DECK</div>
-            <div style={{ fontWeight: 700 }}>{deck.length}</div>
-          </div>
+          <DOSButton onClick={() => setShowDeck(true)} small>
+            DECK {deck.length}
+          </DOSButton>
         </div>
 
         {hasJoker("counter") && (
@@ -1963,6 +1964,7 @@ export default function BeatTheRobot() {
                   setJokerOptions(pickJokerOptions(ownedJokers, r));
                   setMessage(`DEV: Skipped to round ${r}`);
                   setTimeout(() => setMessage(""), 2000);
+                  startRound(r);
                 }
               }}
               style={{
@@ -2270,6 +2272,93 @@ export default function BeatTheRobot() {
               {jokerInfo.desc}
             </div>
             <DOSButton onClick={() => setJokerInfo(null)} variant="primary" full>
+              OK
+            </DOSButton>
+          </div>
+        </div>
+      )}
+
+      {showDeck && (
+        <div
+          onClick={() => setShowDeck(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#1a1a2e",
+              border: "3px solid #00ddff",
+              boxShadow: "5px 5px 0 #000",
+              padding: 16,
+              maxWidth: 400,
+              width: "100%",
+              maxHeight: "80vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: 12,
+                color: "#00ddff",
+                letterSpacing: 1,
+                marginBottom: 10,
+              }}
+            >
+              DECK ({deck.length})
+            </div>
+            {deck.length === 0 ? (
+              <div style={{ fontSize: 16, color: "#ddd", textAlign: "center", padding: 20 }}>
+                DECK EMPTY
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 4,
+                  overflowY: "auto",
+                  maxHeight: "60vh",
+                  padding: 4,
+                }}
+              >
+                {[...deck].sort((a, b) => {
+                  const aIdx = RANKS.indexOf(a.rank as typeof RANKS[number]);
+                  const bIdx = RANKS.indexOf(b.rank as typeof RANKS[number]);
+                  if (aIdx !== bIdx) return aIdx - bIdx;
+                  return a.suit.localeCompare(b.suit);
+                }).map((card, i) => {
+                  const isRed = card.suit === "♥" || card.suit === "♦";
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        background: "#fff",
+                        color: isRed ? "#c00000" : "#000",
+                        border: "1px solid #000",
+                        padding: "2px 4px",
+                        fontSize: 12,
+                        fontFamily: "'VT323', monospace",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {card.rank}{card.suit}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <DOSButton onClick={() => setShowDeck(false)} variant="primary" full style={{ marginTop: 10 }}>
               OK
             </DOSButton>
           </div>
