@@ -9,6 +9,7 @@ export interface Card {
 
 export type JokerId =
   | "777"
+  | "555"
   | "compound"
   | "even"
   | "laststand"

@@ -11,6 +11,13 @@ import {
   guessProbability,
   previewScore,
   applyJokerEffects,
+  UNDERDOG_MULTIPLIER,
+  UNDERDOG_THRESHOLD,
+  LASTSTAND_MULTIPLIER,
+  LUCKY7_MULTIPLIER,
+  LUCKY5_MULTIPLIER,
+  LUCKY5_RANK,
+  LUCKYGUESS_THRESHOLD,
 } from "./constants";
 
 interface CardProps {
@@ -673,9 +680,14 @@ export default function BeatTheRobot() {
       if (isWild) breakdown.push("WILD★");
 
       if (hasJoker("777") && top.rank === "7") {
-        mult *= 3;
-        breakdown.push("L7×3");
+        mult *= LUCKY7_MULTIPLIER;
+        breakdown.push(`L7×${LUCKY7_MULTIPLIER}`);
         triggerJokerBlink("777");
+      }
+      if (hasJoker("555") && top.rank === LUCKY5_RANK) {
+        mult *= LUCKY5_MULTIPLIER;
+        breakdown.push(`L5×${LUCKY5_MULTIPLIER}`);
+        triggerJokerBlink("555");
       }
       if (hasJoker("even") && EVEN_RANKS.has(top.rank)) {
         mult *= 2;
@@ -687,12 +699,12 @@ export default function BeatTheRobot() {
         breakdown.push("GMB×2");
       }
       if (hasJoker("laststand") && aliveCount === 1) {
-        mult *= 5;
-        breakdown.push("LAST×5");
+        mult *= LASTSTAND_MULTIPLIER;
+        breakdown.push(`LAST×${LASTSTAND_MULTIPLIER}`);
       }
-      if (hasJoker("underdog") && probability < 0.4 && probability > 0) {
-        mult *= 2;
-        breakdown.push("UD×2");
+      if (hasJoker("underdog") && probability < UNDERDOG_THRESHOLD && probability > 0) {
+        mult *= UNDERDOG_MULTIPLIER;
+        breakdown.push(`UD×${UNDERDOG_MULTIPLIER}`);
         triggerJokerBlink("underdog");
       }
       if (hasJoker("surething") && probability >= 0.6) {
@@ -717,7 +729,7 @@ export default function BeatTheRobot() {
       if (hasJoker("luckyguess")) {
         const newHot = hotStreak * probability;
         setHotStreak(newHot);
-        if (newHot < 0.1 && deadPiles.some((d) => d)) {
+        if (newHot < LUCKYGUESS_THRESHOLD && deadPiles.some((d) => d)) {
           const deadIdx = deadPiles.findIndex((d) => d);
           const newDead = deadPiles.map((d, i) => (i === deadIdx ? false : d));
           setDeadPiles(newDead);
@@ -1264,7 +1276,7 @@ export default function BeatTheRobot() {
                   }}
                 >
                   {Array.from({ length: 5 }).map((_, i) => {
-                    const cellsFilled = Math.max(0, Math.min(5, Math.floor((0.1 - hotStreak) / 0.02) + 5));
+                    const cellsFilled = Math.max(0, Math.min(5, Math.floor((LUCKYGUESS_THRESHOLD - hotStreak) / 0.04) + 5));
                     const isFilled = i < cellsFilled;
                     return (
                       <div
@@ -1345,7 +1357,7 @@ export default function BeatTheRobot() {
                 {ownedJokers.filter(j => !j.cursed).map((j) => {
                   const depleted = j.id === "phoenix" && phoenixUsed;
                   const selectedTop = selectedPile !== null ? piles[selectedPile]?.[piles[selectedPile].length - 1] : null;
-                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && compoundCounter === 0) || (j.id === "777" && selectedTop?.rank === "7");
+                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && compoundCounter === 0) || (j.id === "777" && selectedTop?.rank === "7") || (j.id === "555" && selectedTop?.rank === LUCKY5_RANK);
                   const counter = j.id === "compound" ? compoundCounter : undefined;
                   return (
                     <JokerCard
@@ -1374,7 +1386,7 @@ export default function BeatTheRobot() {
                 {ownedJokers.filter(j => j.cursed).map((j) => {
                   const depleted = j.id === "phoenix" && phoenixUsed;
                   const selectedTop = selectedPile !== null ? piles[selectedPile]?.[piles[selectedPile].length - 1] : null;
-                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && compoundCounter === 0) || (j.id === "777" && selectedTop?.rank === "7") || (j.id === "hardwayout" && (hardWayCounter === 0 || (guessCount + 1) % 5 === 0));
+                  const isActive = (j.id === "laststand" && aliveCount === 1) || (j.id === "compound" && compoundCounter === 0) || (j.id === "777" && selectedTop?.rank === "7") || (j.id === "555" && selectedTop?.rank === LUCKY5_RANK) || (j.id === "hardwayout" && (hardWayCounter === 0 || (guessCount + 1) % 5 === 0));
                   const counter = j.id === "hardwayout" ? hardWayCounter : undefined;
                   return (
                     <JokerCard

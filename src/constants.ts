@@ -25,12 +25,21 @@ export const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 1800, 2800, 4200, 60
 
 export const WILDCARD_COUNT = 2;
 
+export const UNDERDOG_MULTIPLIER = 5;
+export const UNDERDOG_THRESHOLD = 0.5;
+export const LASTSTAND_MULTIPLIER = 10;
+export const LUCKY7_MULTIPLIER = 3;
+export const LUCKY5_MULTIPLIER = 3;
+export const LUCKY5_RANK = "5";
+export const LUCKYGUESS_THRESHOLD = 0.2;
+
 export const ALL_JOKERS: Joker[] = [
-  { id: "777", name: "777", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00", rarity: "common" },
+  { id: "777", name: "777", desc: `Guessing on a 7 scores ×${LUCKY7_MULTIPLIER}.`, color: "#ffcc00", rarity: "common" },
+  { id: "555", name: "555", desc: `Guessing on a ${LUCKY5_RANK} scores ×${LUCKY5_MULTIPLIER}.`, color: "#ffcc00", rarity: "common" },
   { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa", rarity: "common" },
   { id: "even", name: "EVEN STEVEN", desc: "Guessing on an even rank (2/4/6/8/10) scores ×2.", color: "#88ddff", rarity: "common" },
-  { id: "laststand", name: "LAST STAND", desc: "When only 1 pile is alive, all scoring ×5.", color: "#ff8800", rarity: "common" },
-  { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <40% chance score ×2.", color: "#cc66ff", rarity: "common" },
+  { id: "laststand", name: "LAST STAND", desc: `When only 1 pile is alive, all scoring ×${LASTSTAND_MULTIPLIER}.`, color: "#ff8800", rarity: "common" },
+  { id: "underdog", name: "UNDERDOG", desc: `Correct guesses with <${Math.round(UNDERDOG_THRESHOLD * 100)}% chance score ×${UNDERDOG_MULTIPLIER}.`, color: "#cc66ff", rarity: "common" },
   { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥60% chance score ×1.5.", color: "#66ff66", rarity: "common" },
   { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355", rarity: "uncommon" },
   { id: "wildcard", name: "WILDCARD", desc: `${WILDCARD_COUNT} cards in the deck are wild — any guess is correct.`, color: "#ffd700", rarity: "uncommon" },
@@ -179,12 +188,12 @@ export function previewScore(
     unconditional.push("Gambler ×2");
   }
   if (has("laststand") && aliveCount === 1) {
-    unconditionalMult *= 5;
-    unconditional.push("Last Stand ×5");
+    unconditionalMult *= LASTSTAND_MULTIPLIER;
+    unconditional.push(`Last Stand ×${LASTSTAND_MULTIPLIER}`);
   }
-  if (has("underdog") && prob < 0.4 && prob > 0) {
-    unconditionalMult *= 2;
-    unconditional.push("Underdog ×2");
+  if (has("underdog") && prob < UNDERDOG_THRESHOLD && prob > 0) {
+    unconditionalMult *= UNDERDOG_MULTIPLIER;
+    unconditional.push(`Underdog ×${UNDERDOG_MULTIPLIER}`);
   }
   if (has("surething") && prob >= 0.6) {
     unconditionalMult *= 1.5;
@@ -195,8 +204,12 @@ export function previewScore(
     unconditional.push("Compound ×5");
   }
   if (has("777") && top.rank === "7") {
-    unconditionalMult *= 3;
-    unconditional.push("Lucky 7 ×3");
+    unconditionalMult *= LUCKY7_MULTIPLIER;
+    unconditional.push(`Lucky 7 ×${LUCKY7_MULTIPLIER}`);
+  }
+  if (has("555") && top.rank === LUCKY5_RANK) {
+    unconditionalMult *= LUCKY5_MULTIPLIER;
+    unconditional.push(`Lucky 5 ×${LUCKY5_MULTIPLIER}`);
   }
   if (has("even") && EVEN_RANKS.has(top.rank)) {
     unconditionalMult *= 2;
