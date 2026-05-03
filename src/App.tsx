@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { trackRoundStart, trackRoundWon, trackRunWon, trackRunOver, trackJokerPicked } from "./metrics";
 import type { Card, Joker, GamePhase, Direction, Floater, SwipeOffset, HelpBtnPos } from "./types";
 import {
   RANKS,
@@ -543,6 +544,7 @@ export default function BeatTheRobot() {
     setMessage(`ROUND ${roundNum} — Reach ${ROUND_TARGETS[roundNum - 1]} pts.`);
     setFlashPile(null);
     setFlashKind(null);
+    trackRoundStart(roundNum);
     setPhase("playing");
   };
 
@@ -799,9 +801,11 @@ export default function BeatTheRobot() {
       if (newRoundScore >= target) {
         setRunScore((rs) => rs + newRoundScore);
         if (round >= ROUND_TARGETS.length) {
+          trackRunWon();
           setPhase("runWon");
           setMessage(`*** YOU BEAT THE ROBOT! Final score: ${runScore + newRoundScore} pts ***`);
         } else {
+          trackRoundWon(round);
           setPhase("roundWon");
           setJokerOptions(pickJokerOptions(ownedJokers, round));
           setMessage(`*** ROUND ${round} CLEARED — ${newRoundScore} pts ***`);
@@ -812,6 +816,7 @@ export default function BeatTheRobot() {
 
       if (remainingDeck.length === 0) {
         setRunScore((rs) => rs + newRoundScore);
+        trackRunWon();
         setPhase("runWon");
         setMessage(`*** DECK CLEARED — YOU BEAT THE ROBOT! ***`);
         setSelectedPile(null);
@@ -864,14 +869,17 @@ export default function BeatTheRobot() {
         if (roundScore >= target) {
           setRunScore((rs) => rs + roundScore);
           if (round >= ROUND_TARGETS.length) {
+            trackRunWon();
             setPhase("runWon");
             setMessage(`*** YOU BEAT THE ROBOT! Final score: ${runScore + roundScore} pts ***`);
           } else {
+            trackRoundWon(round);
             setPhase("roundWon");
             setJokerOptions(pickJokerOptions(ownedJokers, round));
             setMessage(`*** ROUND ${round} CLEARED — ${roundScore} pts ***`);
           }
         } else {
+          trackRunOver(round);
           setPhase("runOver");
           setMessage(`*** ALL PILES DEAD. Needed ${target}, got ${roundScore}. ***`);
         }
@@ -880,6 +888,7 @@ export default function BeatTheRobot() {
       }
       if (remainingDeck.length === 0) {
         setRunScore((rs) => rs + roundScore);
+        trackRunWon();
         setPhase("runWon");
         setMessage(`*** DECK CLEARED — YOU BEAT THE ROBOT! ***`);
         setSelectedPile(null);
@@ -903,6 +912,7 @@ export default function BeatTheRobot() {
   };
 
   const chooseJoker = (joker: Joker) => {
+    trackJokerPicked(joker.id);
     const newJokers = [...ownedJokers, joker];
     setOwnedJokers(newJokers);
     const nextRound = round + 1;
