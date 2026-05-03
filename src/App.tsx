@@ -2343,16 +2343,50 @@ export default function BeatTheRobot() {
                     <div
                       key={i}
                       style={{
-                        background: "#fff",
-                        color: isRed ? "#c00000" : "#000",
+                        background: card.wild ? "#ffd700" : "#fff",
+                        color: card.wild ? "#000" : (isRed ? "#c00000" : "#000"),
                         border: "1px solid #000",
-                        padding: "2px 4px",
-                        fontSize: 12,
+                        padding: card.wild ? "1px" : "2px 4px",
+                        fontSize: card.wild ? 10 : 12,
                         fontFamily: "'VT323', monospace",
                         fontWeight: 700,
+                        minWidth: card.wild ? 24 : "auto",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                     >
-                      {card.rank}{card.suit}
+                      {card.wild ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <svg viewBox="0 0 16 22" shapeRendering="crispEdges" style={{ width: 10, height: 14 }}>
+                            <rect x="7" y="1" width="2" height="1" fill="#ff3355" />
+                            <rect x="7" y="2" width="2" height="2" fill="#ffcc00" />
+                            <rect x="3" y="4" width="10" height="8" fill="#c0c0c0" />
+                            <rect x="3" y="4" width="10" height="1" fill="#ffffff" />
+                            <rect x="3" y="11" width="10" height="1" fill="#666" />
+                            <rect x="5" y="6" width="2" height="2" fill="#00ffaa" />
+                            <rect x="9" y="6" width="2" height="2" fill="#00ffaa" />
+                            <rect x="5" y="6" width="1" height="1" fill="#ffffff" />
+                            <rect x="9" y="6" width="1" height="1" fill="#ffffff" />
+                            <rect x="5" y="9" width="6" height="1" fill="#000" />
+                            <rect x="6" y="9" width="1" height="1" fill="#ff3355" />
+                            <rect x="8" y="9" width="1" height="1" fill="#ff3355" />
+                            <rect x="10" y="9" width="1" height="1" fill="#ff3355" />
+                            <rect x="6" y="12" width="4" height="1" fill="#888" />
+                            <rect x="2" y="13" width="12" height="7" fill="#a0a0b0" />
+                            <rect x="2" y="13" width="12" height="1" fill="#ffffff" />
+                            <rect x="2" y="19" width="12" height="1" fill="#555" />
+                            <rect x="6" y="15" width="4" height="3" fill="#000" />
+                            <rect x="7" y="16" width="1" height="1" fill="#ffcc00" />
+                            <rect x="8" y="16" width="1" height="1" fill="#00ffaa" />
+                            <rect x="1" y="14" width="1" height="4" fill="#666" />
+                            <rect x="14" y="14" width="1" height="4" fill="#666" />
+                          </svg>
+                          <span style={{ fontSize: 9 }}>WILD</span>
+                        </div>
+                      ) : (
+                        <>{card.rank}{card.suit}</>
+                      )}
                     </div>
                   );
                 })}

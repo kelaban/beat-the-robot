@@ -23,6 +23,8 @@ export const EVEN_RANKS = new Set(["2", "4", "6", "8", "10"]);
 
 export const ROUND_TARGETS = [50, 120, 250, 450, 750, 1200, 1800, 2800, 4200, 6000, 8500, 12000];
 
+export const WILDCARD_COUNT = 2;
+
 export const ALL_JOKERS: Joker[] = [
   { id: "777", name: "777", desc: "Guessing on a 7 scores ×3.", color: "#ffcc00", rarity: "common" },
   { id: "compound", name: "COMPOUND INT", desc: "Every 5th correct guess scores ×5.", color: "#00ffaa", rarity: "common" },
@@ -31,7 +33,7 @@ export const ALL_JOKERS: Joker[] = [
   { id: "underdog", name: "UNDERDOG", desc: "Correct guesses with <40% chance score ×2.", color: "#cc66ff", rarity: "common" },
   { id: "surething", name: "SURE THING", desc: "Correct guesses with ≥60% chance score ×1.5.", color: "#66ff66", rarity: "common" },
   { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355", rarity: "uncommon" },
-  { id: "wildcard", name: "WILDCARD", desc: "2 cards in the deck are wild — any guess is correct.", color: "#ffd700", rarity: "uncommon" },
+  { id: "wildcard", name: "WILDCARD", desc: `${WILDCARD_COUNT} cards in the deck are wild — any guess is correct.`, color: "#ffd700", rarity: "uncommon" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600", rarity: "uncommon" },
   { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff", rarity: "common" },
   { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom 5 cards of the deck.", color: "#ddaa00", rarity: "common" },
@@ -95,9 +97,11 @@ export function applyJokerEffects(deck: Card[], jokerIds: string[]): Card[] {
   }
 
   if (jokerIds.includes("wildcard")) {
-    const indices = new Set<number>();
-    while (indices.size < 2) indices.add(Math.floor(Math.random() * result.length));
-    result = result.map((c, i) => indices.has(i) ? { ...c, wild: true } : c);
+    const wildCard = { rank: "W", suit: "★", wild: true };
+    for (let i = 0; i < WILDCARD_COUNT; i++) {
+      const pos = Math.floor(Math.random() * (result.length + 1));
+      result.splice(pos, 0, wildCard);
+    }
   }
 
   return result;

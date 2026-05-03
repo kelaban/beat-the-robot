@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildDeck, applyJokerEffects, pickJokerOptions, ROUND_TARGETS, CURSED_DECK_MOD, CURSED_GAMEPLAY } from '../constants'
+import { buildDeck, applyJokerEffects, pickJokerOptions, ROUND_TARGETS, CURSED_DECK_MOD, CURSED_GAMEPLAY, WILDCARD_COUNT } from '../constants'
 
 describe('Joker deck transformations', () => {
   describe('dyslexic joker (2s become 5s)', () => {
@@ -108,8 +108,8 @@ describe('Joker deck transformations', () => {
         'wildcard'
       ])
 
-      // Deck should still have 52 cards
-      expect(transformed.length).toBe(52)
+      // Deck has 52 + WILDCARD_COUNT = 54 cards
+      expect(transformed.length).toBe(52 + WILDCARD_COUNT)
 
       // dyslexic: all 2s become 5s
       const twos = transformed.filter(c => c.rank === '2')
@@ -125,11 +125,11 @@ describe('Joker deck transformations', () => {
 
       // wildcard: 2 cards should be wild
       const wildcards = transformed.filter(c => c.wild === true)
-      expect(wildcards.length).toBe(2)
+      expect(wildcards.length).toBe(WILDCARD_COUNT)
 
-      // All suits should still be represented
+      // All normal suits + wildcard suit should be represented
       const suits = new Set(transformed.map(c => c.suit))
-      expect(suits.size).toBe(4)
+      expect(suits.size).toBe(4 + 1) // 4 normal suits + "★" from wildcards
     })
 
     it('should correctly apply smaller + bigger together', () => {
@@ -197,15 +197,15 @@ describe('Joker deck transformations', () => {
       const transformed = applyJokerEffects(deck, ['wildcard'])
 
       const wildcards = transformed.filter(c => c.wild === true)
-      expect(wildcards.length).toBe(2)
+      expect(wildcards.length).toBe(WILDCARD_COUNT)
     })
 
-    it('should keep deck at 52 cards', () => {
+    it('should add WILDCARD_COUNT cards to deck', () => {
       const deck = buildDeck()
 
       const transformed = applyJokerEffects(deck, ['wildcard'])
 
-      expect(transformed.length).toBe(52)
+      expect(transformed.length).toBe(52 + WILDCARD_COUNT)
     })
   })
 
