@@ -9,7 +9,6 @@ import {
   buildDeck,
   pickJokerOptions,
   guessProbability,
-  countByRank,
   previewScore,
   applyJokerEffects,
 } from "./constants";
@@ -571,7 +570,6 @@ export default function BeatTheRobot() {
   }, [message]);
 
   const aliveCount = deadPiles.filter((d) => !d).length;
-  const rankCounts = useMemo(() => countByRank(deck), [deck]);
   const bottomCards = deck.length >= 5 ? deck.slice(-5) : (deck.length > 0 ? deck : []);
 
   const handlePileClick = (idx: number) => {
@@ -1298,31 +1296,6 @@ export default function BeatTheRobot() {
             DECK {deck.length}
           </DOSButton>
         </div>
-
-        {hasJoker("counter") && (
-          <div
-            style={{
-              background: "#1a1a2e",
-              border: "2px solid #00ddff",
-              boxShadow: "3px 3px 0 #000",
-              padding: "4px 8px",
-              marginBottom: 8,
-              fontSize: 13,
-              color: "#fff",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ color: "#00ddff", fontFamily: "'Press Start 2P', monospace", fontSize: 9 }}>COUNT:</span>
-            {RANKS.map((r) => (
-              <span key={r} style={{ opacity: rankCounts[r] === 0 ? 0.3 : 1 }}>
-                {r}:{rankCounts[r]}
-              </span>
-            ))}
-          </div>
-        )}
 
         {hasJoker("deadreck") && bottomCards.length > 0 && (
           <div

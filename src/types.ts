@@ -17,7 +17,6 @@ export type JokerId =
   | "luckyguess"
   | "wildcard"
   | "phoenix"
-  | "counter"
   | "deadreck"
   | "sticky"
   | "gambler"

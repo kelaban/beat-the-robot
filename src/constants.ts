@@ -35,7 +35,6 @@ export const ALL_JOKERS: Joker[] = [
   { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355", rarity: "uncommon" },
   { id: "wildcard", name: "WILDCARD", desc: `${WILDCARD_COUNT} cards in the deck are wild — any guess is correct.`, color: "#ffd700", rarity: "uncommon" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600", rarity: "uncommon" },
-  { id: "counter", name: "CARD COUNTER", desc: "Shows count of each rank remaining in deck.", color: "#00ddff", rarity: "common" },
   { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom 5 cards of the deck.", color: "#ddaa00", rarity: "common" },
 ];
 
@@ -154,13 +153,6 @@ export function guessProbability(top: Card, direction: Direction, deckRemaining:
     else if (direction === "same" && c.rank === top.rank) favorable++;
   }
   return favorable / deckRemaining.length;
-}
-
-export function countByRank(deck: Card[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const r of RANKS) counts[r] = 0;
-  for (const c of deck) counts[c.rank]++;
-  return counts;
 }
 
 export function previewScore(
