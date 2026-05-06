@@ -41,7 +41,7 @@ Jokers selected from the 50-idea brainstorm; checked items are implemented.
 
 ### Information / probability
 - [x] **Card Counter** — shows count of each rank remaining in deck
-- [x] **Dead Reckoning** — shows the bottom card of the deck
+- [x] **Seer** — shows the bottom card of the deck
 - [ ] ~~Peek~~ *(removed — broke the core "guessing" mechanic)*
 - [ ] Suit Sniffer — show suit distribution remaining
 - [ ] Echo — top of every pile shows the suit of the next deck card
