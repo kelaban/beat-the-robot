@@ -44,7 +44,7 @@ export const ALL_JOKERS: Joker[] = [
   { id: "luckyguess", name: "LUCKY GUESS", desc: "Unlikely guesses and streaks revive piles.", color: "#ff3355", rarity: "uncommon" },
   { id: "wildcard", name: "WILDCARD", desc: `${WILDCARD_COUNT} cards in the deck are wild — any guess is correct.`, color: "#ffd700", rarity: "uncommon" },
   { id: "phoenix", name: "PHOENIX", desc: "First dead pile auto-revives after 3 correct guesses.", color: "#ff6600", rarity: "uncommon" },
-  { id: "deadreck", name: "DEAD RECKONING", desc: "Shows the bottom 5 cards of the deck.", color: "#ddaa00", rarity: "common" },
+  { id: "deadreck", name: "SEER", desc: "Shows the bottom 5 cards of the deck.", color: "#ddaa00", rarity: "common" },
 ];
 
 export const CURSED_DECK_MOD: Joker[] = [
@@ -57,7 +57,7 @@ export const CURSED_DECK_MOD: Joker[] = [
 export const CURSED_GAMEPLAY: Joker[] = [
   { id: "sticky", name: "STICKY BUTTONS", desc: "Piles must be guessed left to right — you cannot choose.", color: "#cc2222", cursed: true },
   { id: "gambler", name: "THE GAMBLER", desc: "All scores ×2. Wrong guesses kill 2 piles.", color: "#cc2222", cursed: true },
-  { id: "hardwayout", name: "HARD WAY OUT", desc: "Every 5th guess, you cannot pick the highest-probability option.", color: "#cc2222", cursed: true },
+  { id: "hardwayout", name: "NO EASY WAY OUT", desc: "Every 5th guess, you cannot pick the highest-probability option.", color: "#cc2222", cursed: true },
   { id: "reshuffle", name: "AUTO-RESHUFFLE", desc: "Piles auto-shuffle when 10+ cards.", color: "#cc2222", cursed: true },
 ];
 
