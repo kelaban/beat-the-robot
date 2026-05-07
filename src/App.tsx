@@ -1797,7 +1797,7 @@ export default function BeatTheRobot() {
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              justifyContent: "center",
+              justifyContent: "flex-start",
               marginBottom: 8,
             }}
           >
@@ -1835,7 +1835,7 @@ export default function BeatTheRobot() {
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              justifyContent: "center",
+              justifyContent: "flex-start",
               marginBottom: 8,
             }}
           >
