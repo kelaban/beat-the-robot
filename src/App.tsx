@@ -1123,7 +1123,6 @@ export default function BeatTheRobot() {
         width: "100vw",
         background: "#008080",
         fontFamily: "'VT323', monospace",
-        padding: "8px",
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
@@ -1192,8 +1191,10 @@ export default function BeatTheRobot() {
           display: "flex",
           flexDirection: "column",
           minHeight: 0,
-          paddingLeft: devMode ? devSidebarWidth + 10 : 0,
+          padding: 8,
+          paddingLeft: devMode ? devSidebarWidth + 10 : 8,
           transition: "padding-left 0.2s ease",
+          boxSizing: "border-box",
         }}
       >
         <div
@@ -1797,7 +1798,7 @@ export default function BeatTheRobot() {
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              justifyContent: "center",
+              justifyContent: "flex-start",
               marginBottom: 8,
             }}
           >
@@ -1835,7 +1836,7 @@ export default function BeatTheRobot() {
               display: "flex",
               flexDirection: "column",
               gap: 8,
-              justifyContent: "center",
+              justifyContent: "flex-start",
               marginBottom: 8,
             }}
           >
