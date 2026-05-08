@@ -3,6 +3,8 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { execSync } from 'child_process'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const gitHash = (() => {
   try {
     return execSync('git rev-parse --short HEAD').toString().trim();
@@ -16,8 +18,5 @@ export default defineConfig({
   define: {
     __GIT_HASH__: JSON.stringify(gitHash),
   },
-  plugins: [
-    react(),
-    babel({ presets: [reactCompilerPreset()] })
-  ],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), cloudflare()],
 })
